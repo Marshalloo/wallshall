@@ -17,7 +17,7 @@
 
 ## Установка
 
-Скачай `Wallshall.exe` из [Releases](../../releases) и запусти. Нужен [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0/runtime).
+Скачай `Wallshall.exe` из [Releases](../../releases) и запусти. Ничего доустанавливать не нужно: .NET упакован внутрь.
 
 Автозапуск включается в настройках программы.
 
@@ -36,7 +36,7 @@ dotnet publish src/Wallshall/Wallshall.csproj -c Release -r win-x64 \
   -p:EnableWindowsTargeting=true -p:PublishSingleFile=true --self-contained false -o dist
 ```
 
-Готовый `Wallshall.exe` появится в `dist`. Чтобы .exe работал без установленного .NET, замени `--self-contained false` на `--self-contained true`: файл станет примерно на 150 МБ больше.
+Готовый `Wallshall.exe` появится в `dist`. Такая сборка требует установленный [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0/runtime) — она быстрее собирается и весит пару мегабайт. Для сборки, которая работает сама по себе (как в Releases), замени `--self-contained false` на `--self-contained true` и добавь `-p:EnableCompressionInSingleFile=true`.
 
 ## Как это работает
 
