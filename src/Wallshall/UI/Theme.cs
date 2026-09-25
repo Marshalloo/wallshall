@@ -3,7 +3,6 @@ using System.Drawing.Text;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
 
-
 static class Theme
 {
     public static readonly Color Bg = Color.FromArgb(32, 32, 32);
@@ -26,7 +25,6 @@ static class Theme
     public static readonly Color Error = Color.FromArgb(255, 153, 164);
     public static readonly Color Warning = Color.FromArgb(252, 225, 0);
 
-
     public static readonly Color Accent = ReadAccent();
     public static readonly Color AccentHover = Blend(Accent, Color.Black, 0.1f);
     public static readonly Color AccentPressed = Blend(Accent, Color.Black, 0.2f);
@@ -39,15 +37,12 @@ static class Theme
     public static readonly float Scale = GetScale();
     public static int S(float v) => (int)Math.Round(v * Scale);
 
-
-
     public static Icon LoadAppIcon(Size? size = null)
     {
         using var s = typeof(Theme).Assembly.GetManifestResourceStream("wallpaper.ico");
         if (s == null) return SystemIcons.Application;
         return size is Size sz ? new Icon(s, sz) : new Icon(s);
     }
-
 
     public static Bitmap Glyph(char ch, int px, Color color)
     {
@@ -65,8 +60,6 @@ static class Theme
         return bmp;
     }
 
-
-
     public static GraphicsPath RoundRect(RectangleF r, float radius)
     {
         var p = new GraphicsPath();
@@ -82,8 +75,6 @@ static class Theme
     public static Color Blend(Color a, Color b, float t) => Color.FromArgb(
         (int)(a.R + (b.R - a.R) * t), (int)(a.G + (b.G - a.G) * t), (int)(a.B + (b.B - a.B) * t));
 
-
-
     [DllImport("dwmapi.dll")]
     static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 
@@ -92,7 +83,6 @@ static class Theme
     const int DWMWA_BORDER_COLOR = 34;
     const int DWMWA_CAPTION_COLOR = 35;
 
-
     public static void DarkTitleBar(IntPtr hwnd)
     {
         int on = 1;
@@ -100,7 +90,6 @@ static class Theme
         int caption = ColorRef(Bg);
         DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, ref caption, 4);
     }
-
 
     public static void RoundPopup(IntPtr hwnd)
     {
@@ -111,8 +100,6 @@ static class Theme
     }
 
     static int ColorRef(Color c) => c.R | (c.G << 8) | (c.B << 16);
-
-
 
     static Color ReadAccent()
     {

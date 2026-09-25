@@ -8,7 +8,6 @@ static class Program
         using var mutex = new Mutex(true, "Wallshall_SingleInstance", out bool first);
         if (!first) return;
 
-        // Показывать свои сообщения вместо системного окна "Unhandled exception"
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
         Application.ThreadException += (_, e) => Report(e.Exception);
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Report(e.ExceptionObject as Exception);

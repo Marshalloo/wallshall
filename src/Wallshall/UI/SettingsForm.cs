@@ -39,7 +39,6 @@ class SettingsForm : DarkForm
         Result = current.Clone();
         Text = "Настройки Wallshall";
 
-
         topRange.Option("1d", "1 день").Option("3d", "3 дня").Option("1w", "1 неделя")
                 .Option("1M", "1 месяц").Option("3M", "3 месяца").Option("6M", "6 месяцев")
                 .Option("1y", "1 год");
@@ -50,7 +49,6 @@ class SettingsForm : DarkForm
               .Option("16x9,16x10", "16x9 и 16x10");
         interval.Option("5", "5").Option("10", "10").Option("15", "15").Option("30", "30")
                 .Option("60", "60").Option("180", "180");
-
 
         var root = new TableLayoutPanel
         {
@@ -102,7 +100,6 @@ class SettingsForm : DarkForm
         AcceptButton = save;
         CancelButton = cancel;
 
-
         apiKey.Value = current.ApiKey;
         general.Checked = current.General;
         anime.Checked = current.Anime;
@@ -117,7 +114,6 @@ class SettingsForm : DarkForm
         cacheDir.Value = current.CacheDir;
         perMonitor.Checked = current.PerMonitor;
         autostart.Checked = Autostart.IsEnabled;
-
 
         showKey.CheckedChanged += (_, _) => apiKey.Password = !showKey.Checked;
         getKey.LinkClicked += (_, _) => Shell.Open("https://wallhaven.cc/settings/account");
@@ -142,22 +138,13 @@ class SettingsForm : DarkForm
         SetKeyStatus("Проверяю…", Theme.TextSecondary);
         try
         {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-            using var req = new HttpRequestMessage(HttpMethod.Get, "https://wallhaven.cc/api/v1/settings");
-            req.Headers.Add("X-API-Key", key);
-            req.Headers.UserAgent.ParseAdd("Wallshall/1.0");
-            using var resp = await http.SendAsync(req);
-
-            switch (resp.StatusCode)
+            switch (await WallhavenApi.CheckKeyAsync(key))
             {
                 case HttpStatusCode.OK: SetKeyStatus("✓ Ключ работает", Theme.Success); break;
                 case HttpStatusCode.Unauthorized: SetKeyStatus("✗ Неверный ключ", Theme.Error); break;
-                default: SetKeyStatus($"Ошибка {(int)resp.StatusCode}", Theme.Warning); break;
+                case null: SetKeyStatus("Сайт недоступен", Theme.Warning); break;
+                case { } code: SetKeyStatus($"Ошибка {(int)code}", Theme.Warning); break;
             }
-        }
-        catch
-        {
-            SetKeyStatus("Сайт недоступен", Theme.Warning);
         }
         finally { checkKey.Enabled = true; }
     }

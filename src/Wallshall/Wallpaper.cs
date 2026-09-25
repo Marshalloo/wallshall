@@ -2,11 +2,8 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
 
-
-
 static class Wallpaper
 {
-
     public static int MonitorCount()
     {
         try
@@ -25,7 +22,6 @@ static class Wallpaper
         }
         catch (Exception ex) { Debug.WriteLine(ex); return 0; }
     }
-
 
     public static void Set(IReadOnlyList<string> files)
     {
@@ -62,7 +58,6 @@ static class Wallpaper
 
     static void SetEverywhere(string path)
     {
-
         using (var key = Registry.CurrentUser.OpenSubKey(@"Control Panel\Desktop", writable: true))
         {
             key?.SetValue("WallpaperStyle", "10");
@@ -81,7 +76,6 @@ static class Wallpaper
     }
 
     enum DesktopWallpaperPosition { Center = 0, Tile = 1, Stretch = 2, Fit = 3, Fill = 4, Span = 5 }
-
 
     [ComImport, Guid("B92B56A9-8B55-4E14-9A89-0199BBB6F93B"),
      InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
@@ -104,7 +98,6 @@ static class Wallpaper
         uint GetBackgroundColor();
         void SetPosition(DesktopWallpaperPosition position);
         DesktopWallpaperPosition GetPosition();
-
     }
 
     [StructLayout(LayoutKind.Sequential)]

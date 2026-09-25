@@ -11,7 +11,6 @@ class AppSettings
     public static string DefaultCacheDir => Path.Combine(AppDir, "cache");
     static readonly string FilePath = Path.Combine(AppDir, "settings.json");
 
-
     public string ApiKeyProtected { get; set; } = "";
 
     [JsonIgnore]
@@ -21,11 +20,9 @@ class AppSettings
         set => ApiKeyProtected = Protect(value.Trim());
     }
 
-
     public bool General { get; set; } = true;
     public bool Anime { get; set; } = true;
     public bool People { get; set; } = true;
-
 
     public bool Sfw { get; set; } = true;
     public bool Sketchy { get; set; } = false;
@@ -73,7 +70,6 @@ class AppSettings
         File.WriteAllText(tmp, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
         File.Move(tmp, FilePath, overwrite: true);
     }
-
 
     static void MigrateFromOldName()
     {

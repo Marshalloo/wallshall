@@ -21,7 +21,6 @@ static class Autostart
         }
     }
 
-
     public static void RemoveLegacy()
     {
         using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);

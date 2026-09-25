@@ -58,7 +58,6 @@ class DarkMenuRenderer : ToolStripRenderer
         using (var b = new SolidBrush(Theme.MenuHover))
             g.FillPath(b, path);
 
-
         if (item.Checked)
         {
             float h = item.Height * 0.4f;
@@ -88,10 +87,6 @@ class DarkMenuRenderer : ToolStripRenderer
     }
 }
 
-
-
-
-
 class DarkForm : Form
 {
     public DarkForm()
@@ -109,7 +104,6 @@ class DarkForm : Form
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
         Icon = Theme.LoadAppIcon();
     }
-
 
     protected void FinishLayout()
     {
@@ -129,7 +123,6 @@ class DarkForm : Form
         Activate();
     }
 }
-
 
 class DarkMessage : DarkForm
 {
@@ -178,13 +171,8 @@ class DarkMessage : DarkForm
     }
 }
 
-
-
-
-
 static class UI
 {
-
     public static FlowLayoutPanel Row(params Control[] controls)
     {
         var p = new FlowLayoutPanel
@@ -201,7 +189,6 @@ static class UI
         return p;
     }
 }
-
 
 class Card : Panel
 {
@@ -253,10 +240,6 @@ class Card : Panel
         g.DrawPath(p, path);
     }
 }
-
-
-
-
 
 class DarkButton : Button
 {
@@ -320,14 +303,9 @@ class DarkButton : Button
     }
 }
 
-
-
-
-
 class DarkCheckBox : CheckBox
 {
     bool hover;
-
 
     public bool Toggle { get; set; }
 
@@ -430,14 +408,6 @@ class DarkCheckBox : CheckBox
     }
 }
 
-
-
-
-
-
-
-
-
 class DarkField : Control
 {
     public readonly TextBox Box = new()
@@ -531,7 +501,6 @@ class DarkField : Control
         using var path = Theme.RoundRect(new RectangleF(0.5f, 0.5f, Width - 1f, Height - 1f), S(4));
         using (var b = new SolidBrush(fill)) g.FillPath(b, path);
         using (var p = new Pen(Theme.Border)) g.DrawPath(p, path);
-
 
         var saved = g.Save();
         g.SetClip(path);
