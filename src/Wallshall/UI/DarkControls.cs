@@ -1,8 +1,8 @@
 using System.Drawing.Drawing2D;
 
-// =====================================================================
-//  Меню
-// =====================================================================
+
+
+
 
 class DarkMenu : ContextMenuStrip
 {
@@ -13,7 +13,7 @@ class DarkMenu : ContextMenuStrip
         ForeColor = Theme.Text;
         Font = Theme.Font;
         Padding = new Padding(Theme.S(4));
-        DropShadowEnabled = false;   // тень и рамку рисует сама Windows
+        DropShadowEnabled = false;
         ImageScalingSize = new Size(Theme.S(16), Theme.S(16));
     }
 
@@ -62,7 +62,7 @@ class DarkMenuRenderer : ToolStripRenderer
         using (var b = new SolidBrush(Theme.MenuHover))
             g.FillPath(b, path);
 
-        // Выбранный пункт списка — акцентная полоска слева, как в Windows 11
+
         if (item.Checked)
         {
             float h = item.Height * 0.4f;
@@ -92,9 +92,9 @@ class DarkMenuRenderer : ToolStripRenderer
     }
 }
 
-// =====================================================================
-//  Окна
-// =====================================================================
+
+
+
 
 class DarkForm : Form
 {
@@ -114,7 +114,7 @@ class DarkForm : Form
         Icon = Theme.LoadAppIcon();
     }
 
-    /// Вызвать в конце конструктора наследника, после добавления контролов.
+
     protected void FinishLayout()
     {
         ResumeLayout(false);
@@ -130,11 +130,11 @@ class DarkForm : Form
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
-        Activate();   // окно, открытое из трея, иначе может оказаться под другими
+        Activate();
     }
 }
 
-/// Тёмная замена MessageBox.
+
 class DarkMessage : DarkForm
 {
     DarkMessage(string text, bool question)
@@ -182,13 +182,13 @@ class DarkMessage : DarkForm
     }
 }
 
-// =====================================================================
-//  Разметка
-// =====================================================================
+
+
+
 
 static class UI
 {
-    /// Горизонтальный ряд контролов, выровненных по центру по вертикали.
+
     public static FlowLayoutPanel Row(params Control[] controls)
     {
         var p = new FlowLayoutPanel
@@ -198,7 +198,7 @@ static class UI
         };
         foreach (var c in controls)
         {
-            c.Anchor = AnchorStyles.Left;   // без Top/Bottom — центрируется по вертикали
+            c.Anchor = AnchorStyles.Left;
             c.Margin = new Padding(0, 0, 8, 0);
             p.Controls.Add(c);
         }
@@ -206,7 +206,7 @@ static class UI
     }
 }
 
-/// Карточка с настройками, как в «Параметрах» Windows 11.
+
 class Card : Panel
 {
     readonly TableLayoutPanel grid = new()
@@ -228,7 +228,7 @@ class Card : Panel
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
         Padding = new Padding(16, 8, 16, 8);
         Margin = new Padding(0, 0, 0, 4);
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210));
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         Controls.Add(grid);
     }
@@ -258,9 +258,9 @@ class Card : Panel
     }
 }
 
-// =====================================================================
-//  Кнопка
-// =====================================================================
+
+
+
 
 class DarkButton : Button
 {
@@ -324,15 +324,15 @@ class DarkButton : Button
     }
 }
 
-// =====================================================================
-//  Флажок / переключатель
-// =====================================================================
+
+
+
 
 class DarkCheckBox : CheckBox
 {
     bool hover;
 
-    /// true — переключатель (toggle switch), false — обычный флажок.
+
     public bool Toggle { get; set; }
 
     public DarkCheckBox()
@@ -434,14 +434,14 @@ class DarkCheckBox : CheckBox
     }
 }
 
-// =====================================================================
-//  Поле ввода / выпадающий список
-// =====================================================================
 
-/// Поле в стиле Windows 11. Может быть:
-///  - обычным полем ввода;
-///  - полем с подсказками (ввести своё или выбрать из списка);
-///  - выпадающим списком (Editable = false).
+
+
+
+
+
+
+
 class DarkField : Control
 {
     public readonly TextBox Box = new()
@@ -536,7 +536,7 @@ class DarkField : Control
         using (var b = new SolidBrush(fill)) g.FillPath(b, path);
         using (var p = new Pen(Theme.Border)) g.DrawPath(p, path);
 
-        // Нижняя граница: серая, а в фокусе — толстая акцентная
+
         var saved = g.Save();
         g.SetClip(path);
         int line = focused ? S(2) : 1;

@@ -1,23 +1,21 @@
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Text.Json;
-using Microsoft.Win32;
 
 class State
 {
     public int Page { get; set; } = 1;
     public string Date { get; set; } = "";
-    public List<string> Used { get; set; } = new();   // имена показанных файлов
+    public List<string> Used { get; set; } = new();
 }
 
 class TrayApp : ApplicationContext
 {
-    const string ApiUrl = "https://wallhaven.cc/api/v1/search";
-    const int MaxPagesPerRun = 10;      // сколько страниц пролистать за раз в поиске новых картинок
-    const int KeepUsedFiles = 30;       // сколько уже показанных картинок оставлять в кэше
-    const int MaxUsedHistory = 5000;    // размер истории показанных
+    const string ApiUrl = "https:
+    const int MaxPagesPerRun = 10;
+    const int KeepUsedFiles = 30;
+    const int MaxUsedHistory = 5000;
     const int ParallelDownloads = 6;
-    const string FilePrefix = "wallhaven-";   // трогаем только свои файлы, даже если папка общая
+    const string FilePrefix = "wallhaven-";
 
     static readonly string StateFile = Path.Combine(AppSettings.AppDir, "state.json");
     static readonly string[] ImageExt = { ".jpg", ".jpeg", ".png" };
@@ -39,7 +37,7 @@ class TrayApp : ApplicationContext
         EnsureCacheDir();
         http.DefaultRequestHeaders.UserAgent.ParseAdd("Wallshall/1.0");
 
-        // Значки из Segoe Fluent Icons: обновить, шестерёнка, папка, корзина, питание
+
         var menu = new DarkMenu();
         menu.AddItem("Сменить обои", '\uE72C', async (_, _) => await ChangeAsync());
         menu.AddItem("Настройки…", '\uE713', async (_, _) => await ShowSettingsAsync());
@@ -64,50 +62,55 @@ class TrayApp : ApplicationContext
         _ = ChangeAsync();
     }
 
-    // ================= Основная логика =================
+
 
     async Task ChangeAsync()
     {
-        if (!await gate.WaitAsync(0)) return;   // уже идёт смена
+        if (!await gate.WaitAsync(0)) return;
         try
         {
-            // Новый день — начинаем топ сначала (показанные всё равно пропустятся)
+
             var today = DateTime.Now.ToString("yyyy-MM-dd");
             bool newDay = state.Date != today;
             if (newDay) { state.Page = 1; state.Date = today; }
 
-            // Если непоказанных в кэше нет (или новый день) — докачиваем
-            string? file = newDay ? null : PickUnused();
+
+            int need = settings.PerMonitor ? Math.Max(1, Wallpaper.MonitorCount()) : 1;
+
+
+            var files = newDay ? new List<string>() : PickUnused(need);
             string? error = null;
-            if (file == null)
+            if (files.Count < need)
             {
                 try { await FillCacheAsync(); }
                 catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 { error = "Неверный API-ключ"; }
                 catch (Exception ex) { error = "Сайт недоступен"; Debug.WriteLine(ex); }
-                file = PickUnused();
+                files = PickUnused(need);
             }
 
-            // Совсем ничего нового — любая из кэша
-            file ??= PickAny();
 
-            if (file == null)
+            if (files.Count < need) files = PickAny(need, files);
+
+            if (files.Count == 0)
             {
                 SetStatus(error ?? "Нет картинок по фильтрам");
                 return;
             }
 
-            SetWallpaper(file);
-            MarkUsed(Path.GetFileName(file));
+            Wallpaper.Set(files);
+            foreach (var f in files) MarkUsed(Path.GetFileName(f));
             CleanupCache();
             SaveState();
-            SetStatus((error != null ? error + ": " : "Обои: ") + Path.GetFileName(file));
+            SetStatus(error != null ? error + ": из кэша"
+                : files.Count > 1 ? $"Обои: {files.Count} шт."
+                : "Обои: " + Path.GetFileName(files[0]));
         }
         finally { gate.Release(); }
     }
 
-    /// Листает страницы топа, пока не найдёт непоказанные картинки,
-    /// и скачивает все непоказанные со страницы (про запас).
+
+
     async Task FillCacheAsync()
     {
         var used = state.Used.ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -115,7 +118,7 @@ class TrayApp : ApplicationContext
         for (int i = 0; i < MaxPagesPerRun; i++)
         {
             var urls = await GetPageAsync(state.Page);
-            if (urls.Count == 0) { state.Page = 1; break; }   // топ закончился — по кругу
+            if (urls.Count == 0) { state.Page = 1; break; }
 
             var fresh = urls.Where(u => !used.Contains(FileNameOf(u))).ToList();
             if (fresh.Count > 0)
@@ -123,7 +126,7 @@ class TrayApp : ApplicationContext
                 await DownloadAllAsync(fresh);
                 return;
             }
-            state.Page++;   // вся страница уже показана — сразу следующая, без "пустого клика"
+            state.Page++;
         }
         SaveState();
     }
@@ -132,7 +135,7 @@ class TrayApp : ApplicationContext
     {
         using var req = new HttpRequestMessage(HttpMethod.Get, $"{ApiUrl}?{settings.BuildQuery()}&page={page}");
         var key = settings.ApiKey;
-        if (key != "") req.Headers.Add("X-API-Key", key);   // в заголовке, чтобы ключ не светился в URL
+        if (key != "") req.Headers.Add("X-API-Key", key);
 
         using var resp = await http.SendAsync(req);
         resp.EnsureSuccessStatusCode();
@@ -150,7 +153,7 @@ class TrayApp : ApplicationContext
         {
             var target = Path.Combine(CacheDir, FileNameOf(url));
             if (File.Exists(target)) return;
-            var tmp = target + ".part";   // чтобы не было битых файлов при обрыве
+            var tmp = target + ".part";
             try
             {
                 await using (var src = await http.GetStreamAsync(url, ct))
@@ -166,7 +169,7 @@ class TrayApp : ApplicationContext
         });
     }
 
-    // ================= Настройки =================
+
 
     async Task ShowSettingsAsync()
     {
@@ -181,18 +184,19 @@ class TrayApp : ApplicationContext
             if (!ok) return;
         }
 
-        await gate.WaitAsync();   // ждём, если сейчас идёт смена обоев
-        bool filtersChanged;
+        await gate.WaitAsync();
+        bool refresh;
         try
         {
             var old = settings;
-            filtersChanged = old.BuildQuery() != result.BuildQuery();
+            bool filtersChanged = old.BuildQuery() != result.BuildQuery();
+            refresh = filtersChanged || old.PerMonitor != result.PerMonitor;
             bool dirChanged = !SamePath(old.CacheDir, result.CacheDir);
 
             if (filtersChanged)
             {
-                // Запас скачан по старым фильтрам (например, с NSFW) — выкидываем его.
-                // История показов остаётся.
+
+
                 DeleteOurFiles(old.CacheDir);
                 if (dirChanged) DeleteOurFiles(result.CacheDir);
                 state.Page = 1;
@@ -207,22 +211,22 @@ class TrayApp : ApplicationContext
             settings.Save();
             SaveState();
             EnsureCacheDir();
-            timer.Interval = settings.IntervalMinutes * 60_000;   // заодно перезапускает отсчёт
+            timer.Interval = settings.IntervalMinutes * 60_000;
             SetStatus("Настройки сохранены");
         }
         finally { gate.Release(); }
 
-        if (filtersChanged) await ChangeAsync();   // сразу показать обои по новым фильтрам
+        if (refresh) await ChangeAsync();
     }
 
-    // ================= Кэш и состояние =================
+
 
     void EnsureCacheDir()
     {
         try { Directory.CreateDirectory(CacheDir); }
         catch
         {
-            // Папка пропала (например, отключили диск) — возвращаемся к стандартной
+
             settings.CacheDir = AppSettings.DefaultCacheDir;
             Directory.CreateDirectory(CacheDir);
             try { settings.Save(); } catch { }
@@ -238,17 +242,30 @@ class TrayApp : ApplicationContext
 
     IEnumerable<FileInfo> CachedImages() => CachedImages(CacheDir);
 
-    string? PickUnused()
+
+    List<string> PickUnused(int count)
     {
         var used = state.Used.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var list = CachedImages().Where(f => !used.Contains(f.Name)).ToArray();
-        return list.Length > 0 ? list[Random.Shared.Next(list.Length)].FullName : null;
+        return CachedImages().Where(f => !used.Contains(f.Name))
+            .OrderBy(_ => Random.Shared.Next()).Take(count)
+            .Select(f => f.FullName).ToList();
     }
 
-    string? PickAny()
+
+    List<string> PickAny(int count, List<string> already)
     {
-        var list = CachedImages().ToArray();
-        return list.Length > 0 ? list[Random.Shared.Next(list.Length)].FullName : null;
+        var result = new List<string>(already);
+        var rest = CachedImages().Select(f => f.FullName)
+            .Where(f => !result.Contains(f, StringComparer.OrdinalIgnoreCase))
+            .OrderBy(_ => Random.Shared.Next()).ToList();
+
+        foreach (var f in rest)
+        {
+            if (result.Count >= count) break;
+            result.Add(f);
+        }
+
+        return result;
     }
 
     void MarkUsed(string name)
@@ -259,7 +276,7 @@ class TrayApp : ApplicationContext
             state.Used.RemoveRange(0, state.Used.Count - MaxUsedHistory);
     }
 
-    /// Удаляет старые показанные файлы; непоказанные (запас) не трогает.
+
     void CleanupCache()
     {
         var order = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -335,24 +352,7 @@ class TrayApp : ApplicationContext
         catch (Exception ex) { Debug.WriteLine(ex); }
     }
 
-    // ================= Windows =================
 
-    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    static extern bool SystemParametersInfo(int uiAction, int uiParam, string pvParam, int fWinIni);
-
-    static void SetWallpaper(string path)
-    {
-        // Стиль "Заполнение", чтобы картинка любого размера закрывала экран
-        using (var key = Registry.CurrentUser.OpenSubKey(@"Control Panel\Desktop", writable: true))
-        {
-            key?.SetValue("WallpaperStyle", "10");
-            key?.SetValue("TileWallpaper", "0");
-        }
-        // SPI_SETDESKWALLPAPER = 20, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE = 3
-        SystemParametersInfo(20, 0, path, 3);
-    }
-
-    // ================= Мелочи =================
 
     static string FileNameOf(string url) => Path.GetFileName(new Uri(url).LocalPath);
 

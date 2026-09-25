@@ -30,6 +30,7 @@ class SettingsForm : DarkForm
     readonly DarkField cacheDir = new(300);
     readonly DarkButton browse = new() { Text = "Обзор…" };
 
+    readonly DarkCheckBox perMonitor = new() { Toggle = true };
     readonly DarkCheckBox autostart = new() { Toggle = true };
 
     public AppSettings Result { get; private set; }
@@ -39,7 +40,7 @@ class SettingsForm : DarkForm
         Result = current.Clone();
         Text = "Настройки Wallshall";
 
-        // ---- Варианты в выпадающих списках ----
+
         topRange.Option("1d", "1 день").Option("3d", "3 дня").Option("1w", "1 неделя")
                 .Option("1M", "1 месяц").Option("3M", "3 месяца").Option("6M", "6 месяцев")
                 .Option("1y", "1 год");
@@ -51,7 +52,7 @@ class SettingsForm : DarkForm
         interval.Option("5", "5").Option("10", "10").Option("15", "15").Option("30", "30")
                 .Option("60", "60").Option("180", "180");
 
-        // ---- Разметка ----
+
         var root = new TableLayoutPanel
         {
             ColumnCount = 1,
@@ -87,6 +88,7 @@ class SettingsForm : DarkForm
         var app = new Card();
         app.AddRow("Менять каждые, мин", interval);
         app.AddRow("Папка кэша", cacheDir, browse);
+        app.AddRow("Разные обои на мониторах", perMonitor);
         app.AddRow("Запуск с Windows", autostart);
         Section("Приложение", app);
 
@@ -101,7 +103,7 @@ class SettingsForm : DarkForm
         AcceptButton = save;
         CancelButton = cancel;
 
-        // ---- Значения ----
+
         apiKey.Value = current.ApiKey;
         general.Checked = current.General;
         anime.Checked = current.Anime;
@@ -114,12 +116,13 @@ class SettingsForm : DarkForm
         ratios.Value = current.Ratios;
         interval.Value = current.IntervalMinutes.ToString();
         cacheDir.Value = current.CacheDir;
+        perMonitor.Checked = current.PerMonitor;
         autostart.Checked = Autostart.IsEnabled;
 
-        // ---- Обработчики ----
+
         showKey.CheckedChanged += (_, _) => apiKey.Password = !showKey.Checked;
         getKey.LinkClicked += (_, _) =>
-            Process.Start(new ProcessStartInfo("https://wallhaven.cc/settings/account") { UseShellExecute = true });
+            Process.Start(new ProcessStartInfo("https:
         checkKey.Click += async (_, _) => await CheckKeyAsync();
         browse.Click += (_, _) => Browse();
         save.Click += (_, _) => Save();
@@ -143,7 +146,7 @@ class SettingsForm : DarkForm
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-            using var req = new HttpRequestMessage(HttpMethod.Get, "https://wallhaven.cc/api/v1/settings");
+            using var req = new HttpRequestMessage(HttpMethod.Get, "https:
             req.Headers.Add("X-API-Key", key);
             req.Headers.UserAgent.ParseAdd("Wallshall/1.0");
             using var resp = await http.SendAsync(req);
@@ -203,6 +206,7 @@ class SettingsForm : DarkForm
         Result.AtLeast = atLeast.Value;
         Result.Ratios = ratios.Value.Replace(" ", "");
         Result.IntervalMinutes = minutes;
+        Result.PerMonitor = perMonitor.Checked;
         Result.CacheDir = dir;
 
         try { Autostart.IsEnabled = autostart.Checked; } catch { }

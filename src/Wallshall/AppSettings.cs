@@ -11,7 +11,7 @@ class AppSettings
     public static string DefaultCacheDir => Path.Combine(AppDir, "cache");
     static readonly string FilePath = Path.Combine(AppDir, "settings.json");
 
-    // Ключ хранится зашифрованным (DPAPI, расшифровать может только текущий пользователь Windows)
+
     public string ApiKeyProtected { get; set; } = "";
 
     [JsonIgnore]
@@ -21,20 +21,21 @@ class AppSettings
         set => ApiKeyProtected = Protect(value.Trim());
     }
 
-    // Категории
+
     public bool General { get; set; } = true;
     public bool Anime { get; set; } = true;
     public bool People { get; set; } = true;
 
-    // Контент
+
     public bool Sfw { get; set; } = true;
     public bool Sketchy { get; set; } = false;
-    public bool Nsfw { get; set; } = false;   // требует API-ключ
+    public bool Nsfw { get; set; } = false;
 
     public string TopRange { get; set; } = "1M";
-    public string AtLeast { get; set; } = "1920x1080";   // "" = любое
-    public string Ratios { get; set; } = "16x9";         // "" = любые
+    public string AtLeast { get; set; } = "1920x1080";
+    public string Ratios { get; set; } = "16x9";
     public int IntervalMinutes { get; set; } = 15;
+    public bool PerMonitor { get; set; } = false;
     public string CacheDir { get; set; } = DefaultCacheDir;
 
     public string BuildQuery()
@@ -73,7 +74,7 @@ class AppSettings
         File.Move(tmp, FilePath, overwrite: true);
     }
 
-    /// Перенос данных со старого названия WallhavenTray (один раз).
+
     static void MigrateFromOldName()
     {
         var oldDir = Path.Combine(Path.GetDirectoryName(AppDir)!, "WallhavenTray");
@@ -81,7 +82,7 @@ class AppSettings
         try
         {
             Directory.Move(oldDir, AppDir);
-            // Если кэш лежал в старой папке по умолчанию — поправить путь в настройках
+
             var file = Path.Combine(AppDir, "settings.json");
             if (File.Exists(file))
                 File.WriteAllText(file, File.ReadAllText(file).Replace(
