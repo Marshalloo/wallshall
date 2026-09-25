@@ -1,6 +1,6 @@
 # Wallshall
 
-Меняет обои рабочего стола Windows на картинки из топа [Wallhaven](https:
+Меняет обои рабочего стола Windows на картинки из топа [Wallhaven](https://wallhaven.cc). Живёт в трее, настраивается в одном окне.
 
 ![Меню в трее](docs/menu.png)
 
@@ -36,11 +36,11 @@ dotnet publish src/Wallshall/Wallshall.csproj -c Release -r win-x64 \
   -p:EnableWindowsTargeting=true -p:PublishSingleFile=true --self-contained false -o dist
 ```
 
-Готовый `Wallshall.exe` появится в `dist`. Такая сборка требует установленный [.NET 8 Desktop Runtime](https:
+Готовый `Wallshall.exe` появится в `dist`. Такая сборка требует установленный [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0/runtime) — она быстрее собирается и весит пару мегабайт. Для сборки, которая работает сама по себе (как в Releases), замени `--self-contained false` на `--self-contained true` и добавь `-p:EnableCompressionInSingleFile=true`.
 
 ## Как это работает
 
-Программа запрашивает топ через `https:
+Программа запрашивает топ через `https://wallhaven.cc/api/v1/search` и ставит выбранный файл обоями через `SystemParametersInfo`. Ключ передаётся заголовком `X-API-Key` и нужен только для NSFW.
 
 Данные лежат в `%LOCALAPPDATA%\Wallshall`:
 
