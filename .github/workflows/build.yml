@@ -9,6 +9,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v4
 
@@ -22,13 +25,30 @@ jobs:
           -p:EnableWindowsTargeting=true -p:PublishSingleFile=true
           --self-contained false -o dist
 
+      - name: Publish standalone
+        run: >
+          dotnet publish src/Wallshall/Wallshall.csproj -c Release -r win-x64
+          -p:EnableWindowsTargeting=true -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          --self-contained true -o dist-standalone
+
+      - name: Collect
+        run: |
+          mv dist-standalone/Wallshall.exe dist/Wallshall-standalone.exe
+          ls -l dist
+
       - uses: actions/upload-artifact@v4
         with:
           name: Wallshall
-          path: dist/Wallshall.exe
+          path: |
+            dist/Wallshall.exe
+            dist/Wallshall-standalone.exe
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/Wallshall.exe
+          generate_release_notes: true
+          files: |
+            dist/Wallshall.exe
+            dist/Wallshall-standalone.exe
