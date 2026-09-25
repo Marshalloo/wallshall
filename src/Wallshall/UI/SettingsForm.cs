@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net;
 
 class SettingsForm : DarkForm
@@ -121,9 +120,7 @@ class SettingsForm : DarkForm
 
 
         showKey.CheckedChanged += (_, _) => apiKey.Password = !showKey.Checked;
-        getKey.LinkClicked += (_, _) =>
-            Process.Start(new ProcessStartInfo("https:
-        checkKey.Click += async (_, _) => await CheckKeyAsync();
+        getKey.LinkClicked += (_, _) => Shell.Open("https://wallhaven.cc/settings/account");
         browse.Click += (_, _) => Browse();
         save.Click += (_, _) => Save();
 
@@ -146,7 +143,7 @@ class SettingsForm : DarkForm
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-            using var req = new HttpRequestMessage(HttpMethod.Get, "https:
+            using var req = new HttpRequestMessage(HttpMethod.Get, "https://wallhaven.cc/api/v1/settings");
             req.Headers.Add("X-API-Key", key);
             req.Headers.UserAgent.ParseAdd("Wallshall/1.0");
             using var resp = await http.SendAsync(req);

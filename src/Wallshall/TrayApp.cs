@@ -10,7 +10,7 @@ class State
 
 class TrayApp : ApplicationContext
 {
-    const string ApiUrl = "https:
+    const string ApiUrl = "https://wallhaven.cc/api/v1/search";
     const int MaxPagesPerRun = 10;
     const int KeepUsedFiles = 30;
     const int MaxUsedHistory = 5000;
@@ -41,7 +41,7 @@ class TrayApp : ApplicationContext
         var menu = new DarkMenu();
         menu.AddItem("Сменить обои", '\uE72C', async (_, _) => await ChangeAsync());
         menu.AddItem("Настройки…", '\uE713', async (_, _) => await ShowSettingsAsync());
-        menu.AddItem("Открыть папку", '\uE838', (_, _) => Process.Start("explorer.exe", CacheDir));
+        menu.AddItem("Открыть папку", '\uE838', (_, _) => Shell.Open(CacheDir));
         menu.AddItem("Очистить кэш", '\uE74D', async (_, _) => await CleanAsync());
         menu.AddSeparator();
         menu.AddItem("Выход", '\uE7E8', (_, _) => Exit());

@@ -1,9 +1,5 @@
 using System.Drawing.Drawing2D;
 
-
-
-
-
 class DarkMenu : ContextMenuStrip
 {
     public DarkMenu()
