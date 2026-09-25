@@ -21,7 +21,7 @@ static class Autostart
         }
     }
 
-    /// Убирает автозапуск под старым названием; если он был — включает под новым.
+
     public static void RemoveLegacy()
     {
         using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
