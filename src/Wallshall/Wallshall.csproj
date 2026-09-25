@@ -6,12 +6,18 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <ApplicationIcon>wallpaper.ico</ApplicationIcon>
     <DebugType>none</DebugType>
+
+    <AssemblyName>Wallshall</AssemblyName>
+    <RootNamespace>Wallshall</RootNamespace>
+    <Product>Wallshall</Product>
+    <Description>Смена обоев рабочего стола из топа Wallhaven</Description>
+    <Version>1.0.0</Version>
+    <ApplicationIcon>Assets\wallpaper.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="wallpaper.ico" LogicalName="wallpaper.ico" />
+    <EmbeddedResource Include="Assets\wallpaper.ico" LogicalName="wallpaper.ico" />
   </ItemGroup>
 
   <ItemGroup>
