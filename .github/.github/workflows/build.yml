@@ -1,0 +1,49 @@
+name: build
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Version
+        id: v
+        run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        if: startsWith(github.ref, 'refs/tags/v')
+
+      - name: Publish
+        run: >
+          dotnet publish src/Wallshall/Wallshall.csproj -c Release -r win-x64
+          -p:EnableWindowsTargeting=true -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+          ${VERSION:+-p:Version=$VERSION}
+          --self-contained true -o dist
+        env:
+          VERSION: ${{ steps.v.outputs.value }}
+
+      - run: ls -l dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Wallshall
+          path: dist/Wallshall.exe
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: dist/Wallshall.exe

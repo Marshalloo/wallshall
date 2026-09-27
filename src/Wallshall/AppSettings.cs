@@ -9,6 +9,7 @@ class AppSettings
     public static readonly string AppDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Wallshall");
     public static string DefaultCacheDir => Path.Combine(AppDir, "cache");
+    public static string DefaultFavoritesDir => Path.Combine(AppDir, "favorites");
     static readonly string FilePath = Path.Combine(AppDir, "settings.json");
 
     public string ApiKeyProtected { get; set; } = "";
@@ -33,7 +34,9 @@ class AppSettings
     public string Ratios { get; set; } = "16x9";
     public int IntervalMinutes { get; set; } = 15;
     public bool PerMonitor { get; set; } = false;
+    public bool FavoritesOnly { get; set; } = false;
     public string CacheDir { get; set; } = DefaultCacheDir;
+    public string FavoritesDir { get; set; } = DefaultFavoritesDir;
 
     public string BuildQuery()
     {
