@@ -10,6 +10,8 @@ class State
     public int Page { get; set; } = 1;
     public string Date { get; set; } = "";
     public List<string> Used { get; set; } = new();
+    public List<string> Current { get; set; } = new();
+    public List<string> FavShown { get; set; } = new();
 
     public HashSet<string> UsedSet() => Used.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -18,6 +20,13 @@ class State
         Used.Remove(name);
         Used.Add(name);
         if (Used.Count > MaxHistory) Used.RemoveRange(0, Used.Count - MaxHistory);
+    }
+
+    public void MarkFavShown(string name)
+    {
+        FavShown.Remove(name);
+        FavShown.Add(name);
+        if (FavShown.Count > MaxHistory) FavShown.RemoveRange(0, FavShown.Count - MaxHistory);
     }
 
     public static State Load()

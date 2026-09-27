@@ -10,7 +10,7 @@ class DarkMenu : ContextMenuStrip
         Font = Theme.Font;
         Padding = new Padding(Theme.S(4));
         DropShadowEnabled = false;
-        ImageScalingSize = new Size(Theme.S(16), Theme.S(16));
+        ImageScalingSize = Theme.MenuImage;
     }
 
     protected override void OnHandleCreated(EventArgs e)
@@ -19,9 +19,11 @@ class DarkMenu : ContextMenuStrip
         Theme.RoundPopup(Handle);
     }
 
-    public ToolStripMenuItem AddItem(string text, char? glyph, EventHandler onClick)
+    public ToolStripMenuItem AddItem(string text, char? glyph, EventHandler? onClick) =>
+        AddItem(text, glyph is char g ? Theme.MenuGlyph(g) : null, onClick);
+
+    public ToolStripMenuItem AddItem(string text, Image? image, EventHandler? onClick)
     {
-        var image = glyph is char g ? Theme.Glyph(g, Theme.S(16), Theme.Text) : null;
         var item = new ToolStripMenuItem(text, image, onClick)
         {
             Padding = new Padding(Theme.S(4), Theme.S(6), Theme.S(12), Theme.S(6)),
@@ -31,7 +33,17 @@ class DarkMenu : ContextMenuStrip
         return item;
     }
 
+    /// Вложенное меню в том же оформлении.
+    public static DarkMenu SubMenu(ToolStripMenuItem item)
+    {
+        var menu = new DarkMenu();
+        item.DropDown = menu;
+        return menu;
+    }
+
     public void AddSeparator() => Items.Add(new ToolStripSeparator());
+
+    public void Insert(int index, ToolStripItem item) => Items.Insert(index, item);
 }
 
 class DarkMenuRenderer : ToolStripRenderer
@@ -580,7 +592,7 @@ class DarkField : Control
         foreach (var (value, text) in options)
         {
             var v = value;
-            var item = menu.AddItem(text, null, (_, _) =>
+            var item = menu.AddItem(text, (Image?)null, (_, _) =>
             {
                 Value = v;
                 if (editable) Box.Focus(); else Focus();
