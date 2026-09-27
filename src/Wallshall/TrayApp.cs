@@ -5,16 +5,29 @@ class TrayApp : ApplicationContext
 {
     const int MaxPagesPerRun = 10;
     const int KeepUsedFiles = 30;
+    const int MaxThumbs = 16;
+    const int MaxLabel = 22;
+
+    const char GlyphFavorite = '';
+    const char GlyphFavoriteOn = '';
+    const char GlyphSite = '';
+    const char GlyphFolder = '';
+    const char GlyphPicture = '';
 
     readonly WallhavenApi api = new();
     readonly NotifyIcon tray;
     readonly DarkMenu menu;
-    readonly ToolStripMenuItem favoriteItem;
-    readonly ToolStripMenuItem favoritesOnlyItem;
-    readonly ToolStripMenuItem openSiteItem;
     readonly System.Windows.Forms.Timer timer;
     readonly SemaphoreSlim gate = new(1, 1);
 
+    readonly ToolStripMenuItem favoriteItem;
+    readonly ToolStripMenuItem siteItem;
+    readonly ToolStripMenuItem revealItem;
+    readonly ToolStripMenuItem favoritesOnlyItem;
+    readonly List<ToolStripMenuItem> monitorItems = new();
+    readonly Dictionary<string, Image> thumbs = new(StringComparer.OrdinalIgnoreCase);
+
+    int blockFor = -1;
     AppSettings settings;
     State state;
     SettingsForm? settingsForm;
@@ -28,17 +41,21 @@ class TrayApp : ApplicationContext
         state = State.Load();
         EnsureDirs();
 
+        // Пункты для одной картинки: живут в меню, пока обои одни на все экраны
+        favoriteItem = new ToolStripMenuItem("В избранное", null, (_, _) => ToggleFavorite(FileAt(0)));
+        siteItem = new ToolStripMenuItem("Открыть на сайте", Theme.MenuGlyph(GlyphSite), (_, _) => OpenSite(FileAt(0)));
+        revealItem = new ToolStripMenuItem("Показать в папке", Theme.MenuGlyph(GlyphFolder), (_, _) => Reveal(FileAt(0)));
+        foreach (var item in new[] { favoriteItem, siteItem, revealItem }) Style(item);
+
         menu = new DarkMenu();
         menu.AddItem("Сменить обои", '', async (_, _) => await ChangeAsync());
-        favoriteItem = menu.AddItem("В избранное", '', (_, _) => ToggleFavorite());
+        menu.AddSeparator();
+        menu.AddSeparator();
         favoritesOnlyItem = menu.AddItem("Только избранное", '', async (_, _) => await ToggleFavoritesOnlyAsync());
-        menu.AddSeparator();
-        openSiteItem = menu.AddItem("Открыть на сайте", '', (_, _) => OpenSite());
-        menu.AddItem("Показать в папке", '', (_, _) => ShowInFolder());
         menu.AddItem("Открыть избранное", '', (_, _) => Shell.Open(FavoritesDir));
-        menu.AddSeparator();
         menu.AddItem("Настройки…", '', async (_, _) => await ShowSettingsAsync());
         menu.AddItem("Очистить кэш", '', async (_, _) => await CleanAsync());
+        menu.AddSeparator();
         menu.AddItem("Выход", '', (_, _) => Exit());
         menu.Opening += (_, _) => RefreshMenu();
 
@@ -63,7 +80,7 @@ class TrayApp : ApplicationContext
         if (!await gate.WaitAsync(0)) return;
         try
         {
-            int need = settings.PerMonitor ? Math.Max(1, Wallpaper.MonitorCount()) : 1;
+            int need = settings.PerMonitor ? Math.Max(1, Wallpaper.Count()) : 1;
             var (files, error) = settings.FavoritesOnly
                 ? PickFavorites(need)
                 : await PickFromCacheAsync(need);
@@ -74,8 +91,8 @@ class TrayApp : ApplicationContext
                 return;
             }
 
-            Wallpaper.Set(files);
-            state.Current = files;
+            bool perMonitor = Wallpaper.Set(files);
+            state.Current = perMonitor ? files : new List<string> { files[0] };
 
             if (settings.FavoritesOnly)
             {
@@ -89,6 +106,7 @@ class TrayApp : ApplicationContext
 
             state.Save();
             SetStatus(Status(files, error));
+            await WarmThumbsAsync();
         }
         finally { gate.Release(); }
     }
@@ -159,48 +177,155 @@ class TrayApp : ApplicationContext
         }
     }
 
+    // ================= Меню =================
+
+    /// Обои разные — строка на каждый монитор; одни на всех — плоские пункты.
     void RefreshMenu()
     {
-        var current = CurrentFiles();
-        bool saved = current.Count > 0 && current.All(f => Favorites.Contains(FavoritesDir, f));
+        int count = state.Current.Count > 1 ? state.Current.Count : 0;
+        if (count != blockFor) BuildBlock(count);
+
+        if (blockFor == 0) UpdateSingle();
+        else UpdateMonitors();
+
+        int total = Favorites.Count(FavoritesDir);
+        favoritesOnlyItem.Text = total > 0 ? $"Только избранное ({total})" : "Только избранное";
+        favoritesOnlyItem.Checked = settings.FavoritesOnly;
+    }
+
+    void BuildBlock(int count)
+    {
+        while (menu.Items.Count > 2 && menu.Items[2] is not ToolStripSeparator) menu.Items.RemoveAt(2);
+
+        if (count == 0)
+        {
+            menu.Insert(2, favoriteItem);
+            menu.Insert(3, siteItem);
+            menu.Insert(4, revealItem);
+        }
+        else
+        {
+            while (monitorItems.Count < count) monitorItems.Add(CreateMonitorItem(monitorItems.Count));
+            for (int i = 0; i < count; i++) menu.Insert(2 + i, monitorItems[i]);
+        }
+        blockFor = count;
+    }
+
+    ToolStripMenuItem CreateMonitorItem(int index)
+    {
+        var item = new ToolStripMenuItem();
+        Style(item);
+
+        var sub = DarkMenu.SubMenu(item);
+        sub.AddItem("В избранное", GlyphFavorite, (_, _) => ToggleFavorite(FileAt(index)));
+        sub.AddItem("Открыть на сайте", GlyphSite, (_, _) => OpenSite(FileAt(index)));
+        sub.AddItem("Показать в папке", GlyphFolder, (_, _) => Reveal(FileAt(index)));
+        return item;
+    }
+
+    void UpdateSingle()
+    {
+        var file = FileAt(0);
+        bool saved = file != null && Favorites.Contains(FavoritesDir, file);
 
         favoriteItem.Text = saved ? "Убрать из избранного" : "В избранное";
-        favoriteItem.Enabled = current.Count > 0;
-        SetGlyph(favoriteItem, saved ? '' : '');
-
-        int count = Favorites.Count(FavoritesDir);
-        favoritesOnlyItem.Text = count > 0 ? $"Только избранное ({count})" : "Только избранное";
-        favoritesOnlyItem.Checked = settings.FavoritesOnly;
-
-        openSiteItem.Enabled = current.Any(f => Cache.WallhavenId(f) != null);
+        favoriteItem.Image = Theme.MenuGlyph(saved ? GlyphFavoriteOn : GlyphFavorite);
+        favoriteItem.Enabled = file != null;
+        siteItem.Enabled = file != null && Cache.WallhavenId(file) != null;
+        revealItem.Enabled = file != null;
     }
 
-    static void SetGlyph(ToolStripItem item, char glyph)
+    void UpdateMonitors()
     {
-        var old = item.Image;
-        item.Image = Theme.Glyph(glyph, Theme.S(16), Theme.Text);
-        old?.Dispose();
-    }
+        var monitors = Wallpaper.Monitors();
+        bool named = monitors.Count == blockFor;
 
-    List<string> CurrentFiles() => state.Current.Where(File.Exists).ToList();
-
-    void ToggleFavorite()
-    {
-        var current = CurrentFiles();
-        if (current.Count == 0) return;
-
-        if (current.All(f => Favorites.Contains(FavoritesDir, f)))
+        for (int i = 0; i < blockFor; i++)
         {
-            int removed = current.Count(f => Favorites.Remove(FavoritesDir, f));
-            state.Current = current.Where(File.Exists).ToList();
+            var item = monitorItems[i];
+            var file = FileAt(i);
+            var name = named ? monitors[i].Name : $"Обои {i + 1}";
+            bool saved = file != null && Favorites.Contains(FavoritesDir, file);
+
+            item.Text = file == null ? name : $"{name} · {Label(file)}" + (saved ? "  ★" : "");
+            item.Image = (file == null ? null : Thumb(file)) ?? Theme.MenuGlyph(GlyphPicture);
+            item.Enabled = file != null;
+
+            var favorite = (ToolStripMenuItem)item.DropDownItems[0];
+            favorite.Text = saved ? "Убрать из избранного" : "В избранное";
+            favorite.Image = Theme.MenuGlyph(saved ? GlyphFavoriteOn : GlyphFavorite);
+            item.DropDownItems[1].Enabled = file != null && Cache.WallhavenId(file) != null;
+        }
+    }
+
+    static void Style(ToolStripItem item)
+    {
+        item.Padding = new Padding(Theme.S(4), Theme.S(6), Theme.S(12), Theme.S(6));
+        item.ForeColor = Theme.Text;
+    }
+
+    static string Label(string file)
+    {
+        var name = Cache.WallhavenId(file) ?? Path.GetFileNameWithoutExtension(file);
+        return name.Length > MaxLabel ? name[..MaxLabel] + "…" : name;
+    }
+
+    string? FileAt(int index) =>
+        index < state.Current.Count && File.Exists(state.Current[index]) ? state.Current[index] : null;
+
+    Image? Thumb(string file)
+    {
+        if (thumbs.TryGetValue(file, out var cached)) return cached;
+
+        var image = Theme.Thumbnail(file);
+        if (image != null) thumbs[file] = image;
+        return image;
+    }
+
+    /// Раскодировать обои в 4K — дело небыстрое, поэтому готовим миниатюры заранее и не на UI-потоке.
+    async Task WarmThumbsAsync()
+    {
+        var files = state.Current.Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(f => !thumbs.ContainsKey(f))
+            .ToList();
+        if (files.Count == 0) return;
+
+        var made = await Task.Run(() => files.Select(f => (File: f, Image: Theme.Thumbnail(f))).ToList());
+        foreach (var (file, image) in made)
+            if (image != null) thumbs[file] = image;
+
+        TrimThumbs();
+    }
+
+    /// Миниатюры не удаляются, пока могут быть нарисованы в меню, — просто ограничиваем их число.
+    void TrimThumbs()
+    {
+        if (thumbs.Count <= MaxThumbs) return;
+
+        var keep = state.Current.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var key in thumbs.Keys.Where(k => !keep.Contains(k)).ToList())
+        {
+            if (thumbs.Count <= MaxThumbs) break;
+            thumbs.Remove(key);
+        }
+    }
+
+    // ================= Действия =================
+
+    void ToggleFavorite(string? file)
+    {
+        if (file == null) return;
+
+        if (Favorites.Contains(FavoritesDir, file))
+        {
+            bool removed = Favorites.Remove(FavoritesDir, file);
+            state.Current = state.Current.Where(File.Exists).ToList();
             state.Save();
-            SetStatus(removed > 0 ? "Убрано из избранного" : "Не удалось убрать");
+            SetStatus(removed ? "Убрано из избранного" : "Не удалось убрать");
             return;
         }
 
-        int added = current.Count(f => Favorites.Add(FavoritesDir, f));
-        SetStatus(added > 1 ? $"В избранном: +{added}" :
-                  added > 0 ? "Добавлено в избранное" : "Не удалось добавить");
+        SetStatus(Favorites.Add(FavoritesDir, file) ? "Добавлено в избранное" : "Не удалось добавить");
     }
 
     async Task ToggleFavoritesOnlyAsync()
@@ -218,18 +343,19 @@ class TrayApp : ApplicationContext
         await ChangeAsync();
     }
 
-    void OpenSite()
+    void OpenSite(string? file)
     {
-        var id = CurrentFiles().Select(Cache.WallhavenId).FirstOrDefault(x => x != null);
+        var id = file == null ? null : Cache.WallhavenId(file);
         if (id != null) Shell.Open("https://wallhaven.cc/w/" + id);
     }
 
-    void ShowInFolder()
+    void Reveal(string? file)
     {
-        var current = CurrentFiles().FirstOrDefault();
-        if (current == null || !Shell.Reveal(current))
+        if (file == null || !Shell.Reveal(file))
             Shell.Open(settings.FavoritesOnly ? FavoritesDir : CacheDir);
     }
+
+    // ================= Настройки =================
 
     async Task ShowSettingsAsync()
     {

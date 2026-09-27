@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.Runtime.InteropServices;
@@ -58,6 +59,49 @@ static class Theme
         };
         g.DrawString(ch.ToString(), font, brush, new RectangleF(0, 0, px, px), fmt);
         return bmp;
+    }
+
+    public static Size MenuImage { get; } = new(S(28), S(16));
+
+    static readonly Dictionary<char, Bitmap> menuGlyphs = new();
+
+    public static Bitmap MenuGlyph(char ch)
+    {
+        if (menuGlyphs.TryGetValue(ch, out var cached)) return cached;
+
+        var bmp = new Bitmap(MenuImage.Width, MenuImage.Height);
+        using (var g = Graphics.FromImage(bmp))
+        using (var icon = Glyph(ch, S(16), Text))
+            g.DrawImage(icon, (MenuImage.Width - icon.Width) / 2, (MenuImage.Height - icon.Height) / 2);
+
+        menuGlyphs[ch] = bmp;
+        return bmp;
+    }
+
+    public static Bitmap? Thumbnail(string file)
+    {
+        try
+        {
+            using var stream = new MemoryStream(File.ReadAllBytes(file));
+            using var source = Image.FromStream(stream, useEmbeddedColorManagement: false, validateImageData: false);
+
+            var bmp = new Bitmap(MenuImage.Width, MenuImage.Height);
+            using (var g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+
+                using var clip = RoundRect(new RectangleF(0, 0, MenuImage.Width, MenuImage.Height), S(2));
+                g.SetClip(clip);
+
+                float scale = Math.Max((float)MenuImage.Width / source.Width, (float)MenuImage.Height / source.Height);
+                float w = source.Width * scale, h = source.Height * scale;
+                g.DrawImage(source, (MenuImage.Width - w) / 2, (MenuImage.Height - h) / 2, w, h);
+            }
+            return bmp;
+        }
+        catch (Exception ex) { Debug.WriteLine(ex); return null; }
     }
 
     public static GraphicsPath RoundRect(RectangleF r, float radius)
