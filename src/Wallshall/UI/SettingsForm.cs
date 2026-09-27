@@ -27,9 +27,12 @@ class SettingsForm : DarkForm
     readonly DarkField interval = new(200);
 
     readonly DarkField cacheDir = new(300);
-    readonly DarkButton browse = new() { Text = "Обзор…" };
+    readonly DarkButton browseCache = new() { Text = "Обзор…" };
+    readonly DarkField favoritesDir = new(300);
+    readonly DarkButton browseFavorites = new() { Text = "Обзор…" };
 
     readonly DarkCheckBox perMonitor = new() { Toggle = true };
+    readonly DarkCheckBox favoritesOnly = new() { Toggle = true };
     readonly DarkCheckBox autostart = new() { Toggle = true };
 
     public AppSettings Result { get; private set; }
@@ -82,9 +85,14 @@ class SettingsForm : DarkForm
         filters.AddRow("Пропорции", ratios);
         Section("Фильтры", filters);
 
+        var favorites = new Card();
+        favorites.AddRow("Папка избранного", favoritesDir, browseFavorites);
+        favorites.AddRow("Только избранное", favoritesOnly);
+        Section("Избранное", favorites);
+
         var app = new Card();
         app.AddRow("Менять каждые, мин", interval);
-        app.AddRow("Папка кэша", cacheDir, browse);
+        app.AddRow("Папка кэша", cacheDir, browseCache);
         app.AddRow("Разные обои на мониторах", perMonitor);
         app.AddRow("Запуск с Windows", autostart);
         Section("Приложение", app);
@@ -93,8 +101,26 @@ class SettingsForm : DarkForm
         var cancel = new DarkButton { Text = "Отмена", DialogResult = DialogResult.Cancel };
         var buttons = UI.Row(save, cancel);
         buttons.Anchor = AnchorStyles.Right;
-        buttons.Margin = new Padding(0, 20, 0, 0);
-        root.Controls.Add(buttons);
+        buttons.Margin = new Padding(0, 0, 0, 0);
+
+        var footer = new TableLayoutPanel
+        {
+            ColumnCount = 2,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Anchor = AnchorStyles.Left | AnchorStyles.Right,
+            Margin = new Padding(0, 20, 0, 0),
+        };
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        footer.Controls.Add(new Label
+        {
+            Text = AppInfo.Display, AutoSize = true,
+            ForeColor = Theme.TextDisabled, Anchor = AnchorStyles.Left,
+            Margin = new Padding(2, 0, 12, 0),
+        });
+        footer.Controls.Add(buttons);
+        root.Controls.Add(footer);
 
         Controls.Add(root);
         AcceptButton = save;
@@ -112,12 +138,16 @@ class SettingsForm : DarkForm
         ratios.Value = current.Ratios;
         interval.Value = current.IntervalMinutes.ToString();
         cacheDir.Value = current.CacheDir;
+        favoritesDir.Value = current.FavoritesDir;
         perMonitor.Checked = current.PerMonitor;
+        favoritesOnly.Checked = current.FavoritesOnly;
         autostart.Checked = Autostart.IsEnabled;
 
         showKey.CheckedChanged += (_, _) => apiKey.Password = !showKey.Checked;
         getKey.LinkClicked += (_, _) => Shell.Open("https://wallhaven.cc/settings/account");
-        browse.Click += (_, _) => Browse();
+        checkKey.Click += async (_, _) => await CheckKeyAsync();
+        browseCache.Click += (_, _) => Browse(cacheDir, "Папка для скачанных обоев");
+        browseFavorites.Click += (_, _) => Browse(favoritesDir, "Папка для избранных обоев");
         save.Click += (_, _) => Save();
 
         FinishLayout();
@@ -149,15 +179,27 @@ class SettingsForm : DarkForm
         finally { checkKey.Enabled = true; }
     }
 
-    void Browse()
+    void Browse(DarkField field, string title)
     {
         using var dlg = new FolderBrowserDialog
         {
-            Description = "Папка для скачанных обоев",
+            Description = title,
             UseDescriptionForTitle = true,
-            SelectedPath = Directory.Exists(cacheDir.Value) ? cacheDir.Value : AppSettings.AppDir,
+            SelectedPath = Directory.Exists(field.Value) ? field.Value : AppSettings.AppDir,
         };
-        if (dlg.ShowDialog(this) == DialogResult.OK) cacheDir.Value = dlg.SelectedPath;
+        if (dlg.ShowDialog(this) == DialogResult.OK) field.Value = dlg.SelectedPath;
+    }
+
+    string? Prepare(DarkField field, string error)
+    {
+        try
+        {
+            if (field.Value == "") throw new Exception();
+            var dir = Path.GetFullPath(field.Value);
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+        catch { DarkMessage.Info(error, this); return null; }
     }
 
     void Save()
@@ -170,14 +212,23 @@ class SettingsForm : DarkForm
         if (!int.TryParse(interval.Value, out int minutes) || minutes < 1 || minutes > 1440)
         { DarkMessage.Info("Интервал — целое число минут от 1 до 1440.", this); return; }
 
-        var dir = cacheDir.Value;
-        try
+        var dir = Prepare(cacheDir, "Не удалось использовать эту папку для кэша.");
+        if (dir == null) return;
+
+        var favDir = Prepare(favoritesDir, "Не удалось использовать эту папку для избранного.");
+        if (favDir == null) return;
+
+        if (Cache.SamePath(dir, favDir))
         {
-            if (dir == "") throw new Exception();
-            dir = Path.GetFullPath(dir);
-            Directory.CreateDirectory(dir);
+            DarkMessage.Info("Папки кэша и избранного должны быть разными, иначе очистка кэша удалит избранное.", this);
+            return;
         }
-        catch { DarkMessage.Info("Не удалось использовать эту папку для кэша.", this); return; }
+
+        if (favoritesOnly.Checked && Favorites.Count(favDir) == 0)
+        {
+            DarkMessage.Info("В папке избранного нет картинок — режим «Только избранное» включить не получится.", this);
+            return;
+        }
 
         Result.ApiKey = key;
         Result.General = general.Checked;
@@ -191,7 +242,9 @@ class SettingsForm : DarkForm
         Result.Ratios = ratios.Value.Replace(" ", "");
         Result.IntervalMinutes = minutes;
         Result.PerMonitor = perMonitor.Checked;
+        Result.FavoritesOnly = favoritesOnly.Checked;
         Result.CacheDir = dir;
+        Result.FavoritesDir = favDir;
 
         try { Autostart.IsEnabled = autostart.Checked; } catch { }
 

@@ -6,11 +6,23 @@ static class Cache
 
     static readonly string[] Extensions = { ".jpg", ".jpeg", ".png" };
 
-    public static IEnumerable<FileInfo> Images(string dir) =>
+    public static IEnumerable<FileInfo> Images(string dir) => Enumerate(dir, Prefix + "*");
+
+    public static IEnumerable<FileInfo> AllImages(string dir) => Enumerate(dir, "*");
+
+    static IEnumerable<FileInfo> Enumerate(string dir, string pattern) =>
         Directory.Exists(dir)
-            ? new DirectoryInfo(dir).EnumerateFiles(Prefix + "*")
+            ? new DirectoryInfo(dir).EnumerateFiles(pattern)
                 .Where(f => Extensions.Contains(f.Extension, StringComparer.OrdinalIgnoreCase))
             : Enumerable.Empty<FileInfo>();
+
+    public static string? WallhavenId(string file)
+    {
+        var name = Path.GetFileNameWithoutExtension(file);
+        return name.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase)
+            ? name[Prefix.Length..]
+            : null;
+    }
 
     public static List<string> PickUnused(string dir, HashSet<string> used, int count) =>
         Images(dir).Where(f => !used.Contains(f.Name))
