@@ -32,6 +32,19 @@ class AppSettings
     public string TopRange { get; set; } = "1M";
     public string AtLeast { get; set; } = "1920x1080";
     public string Ratios { get; set; } = "16x9";
+
+    /// Пусто в файле — настройки от старой версии, где был только список Ratios.
+    public string? RatioMode { get; set; }
+
+    [JsonIgnore]
+    public string Mode
+    {
+        get => RatioMode ?? (Ratios == "" ? RatioSelection.ModeAny : RatioSelection.ModeCustom);
+        set => RatioMode = value;
+    }
+
+    /// Формы экранов подставляет приложение: сюда не тянем ни COM, ни WinForms.
+    public static Func<string> ScreenRatios { get; set; } = () => "";
     public int IntervalMinutes { get; set; } = 15;
     public bool PerMonitor { get; set; } = false;
     public bool FavoritesOnly { get; set; } = false;
@@ -45,11 +58,18 @@ class AppSettings
                 $"&categories={B(General)}{B(Anime)}{B(People)}" +
                 $"&purity={B(Sfw)}{B(Sketchy)}{B(nsfw)}";
         if (AtLeast != "") q += "&atleast=" + Uri.EscapeDataString(AtLeast);
-        if (Ratios != "") q += "&ratios=" + string.Join(",", RatioSelection.Parse(Ratios).Select(Uri.EscapeDataString));
+
+        var ratios = RatioSelection.Query(Mode, Ratios, ScreenRatios());
+        if (ratios != "") q += "&ratios=" + string.Join(",", RatioSelection.Parse(ratios).Select(Uri.EscapeDataString));
+
         return q;
     }
 
     static char B(bool b) => b ? '1' : '0';
+
+    /// Новая установка: пропорции берём от экрана. У старых настроек режима нет,
+    /// и там остаётся их список, иначе фильтр сменился бы сам собой.
+    static AppSettings Fresh() => new() { RatioMode = RatioSelection.ModeScreen, Ratios = "" };
 
     public AppSettings Clone() =>
         JsonSerializer.Deserialize<AppSettings>(JsonSerializer.Serialize(this))!;
@@ -60,10 +80,10 @@ class AppSettings
         try
         {
             if (File.Exists(FilePath))
-                return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath)) ?? new();
+                return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath)) ?? Fresh();
         }
         catch { }
-        return new();
+        return Fresh();
     }
 
     public void Save()

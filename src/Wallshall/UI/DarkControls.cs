@@ -212,6 +212,70 @@ static class UI
     }
 }
 
+/// Переключатель из нескольких сегментов: выбран ровно один.
+class DarkSegments : Panel
+{
+    readonly FlowLayoutPanel row = new()
+    {
+        AutoSize = true,
+        AutoSizeMode = AutoSizeMode.GrowAndShrink,
+        WrapContents = false,
+        Margin = Padding.Empty,
+        Location = new Point(3, 3),
+    };
+
+    readonly List<DarkButton> segments = new();
+
+    public event EventHandler? ValueChanged;
+
+    public DarkSegments()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        AutoSize = true;
+        AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        Padding = new Padding(3);
+        Margin = Padding.Empty;
+        Controls.Add(row);
+    }
+
+    public string Value
+    {
+        get => segments.FirstOrDefault(s => s.Chosen)?.Tag as string ?? "";
+        set
+        {
+            foreach (var segment in segments) segment.Chosen = (string?)segment.Tag == value;
+        }
+    }
+
+    public DarkSegments Add(string value, string text)
+    {
+        var segment = new DarkButton { Text = text, Tag = value }.AsSegment();
+        segment.Click += (_, _) =>
+        {
+            if (segment.Chosen) return;
+            Value = value;
+            ValueChanged?.Invoke(this, EventArgs.Empty);
+        };
+        segments.Add(segment);
+        row.Controls.Add(segment);
+        return this;
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        g.Clear(Parent?.BackColor ?? Theme.Card);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+
+        using var path = Theme.RoundRect(new RectangleF(0.5f, 0.5f, Width - 1f, Height - 1f), LogicalToDeviceUnits(4));
+        using var fill = new SolidBrush(Theme.Field);
+        using var pen = new Pen(Theme.Border);
+        g.FillPath(fill, path);
+        g.DrawPath(pen, path);
+    }
+}
+
 class Card : Panel
 {
     readonly TableLayoutPanel grid = new()
@@ -299,12 +363,25 @@ class DarkButton : Button
         MinimumSize = new Size(96, 32);
     }
 
+    /// Сегмент переключателя: без рамки, фон только у выбранного.
+    public bool Segment { get; set; }
+
     /// Компактный вид для набора переключателей.
     public DarkButton AsChip(int minWidth)
     {
         Padding = new Padding(8, 2, 8, 2);
         MinimumSize = new Size(minWidth, 28);
         Margin = new Padding(0, 0, 6, 6);
+        return this;
+    }
+
+    /// Сегмент внутри DarkSegments.
+    public DarkButton AsSegment()
+    {
+        Segment = true;
+        Padding = new Padding(12, 2, 12, 2);
+        MinimumSize = new Size(0, 28);
+        Margin = new Padding(0, 0, 2, 0);
         return this;
     }
 
@@ -327,6 +404,11 @@ class DarkButton : Button
             fill = pressed ? Theme.AccentPressed : hover ? Theme.AccentHover : Theme.Accent;
             text = Theme.OnAccent;
         }
+        else if (Segment)
+        {
+            fill = pressed ? Theme.ControlPressed : hover ? Theme.ControlHover : Theme.Field;
+            text = Theme.Text;
+        }
         else
         {
             fill = pressed ? Theme.ControlPressed : hover ? Theme.ControlHover : Theme.Control;
@@ -334,10 +416,10 @@ class DarkButton : Button
         }
 
         var r = new RectangleF(0.5f, 0.5f, Width - 1f, Height - 1f);
-        using (var path = Theme.RoundRect(r, LogicalToDeviceUnits(4)))
+        using (var path = Theme.RoundRect(r, LogicalToDeviceUnits(Segment ? 3 : 4)))
         {
             using (var b = new SolidBrush(fill)) g.FillPath(b, path);
-            if (!accent)
+            if (!accent && !Segment)
                 using (var p = new Pen(Theme.Border)) g.DrawPath(p, path);
         }
 
@@ -484,6 +566,7 @@ class DarkField : Control
 
         Box.Enter += (_, _) => Invalidate();
         Box.Leave += (_, _) => Invalidate();
+        Box.TextChanged += (_, _) => ValueChanged?.Invoke(this, EventArgs.Empty);
         Box.MouseEnter += (_, _) => UpdateHover();
         Box.MouseLeave += (_, _) => UpdateHover();
         Box.KeyDown += (_, e) =>
@@ -514,10 +597,16 @@ class DarkField : Control
         set => Box.PlaceholderText = value;
     }
 
+    public event EventHandler? ValueChanged;
+
     public string Value
     {
         get => editable ? Box.Text.Trim() : pickValue;
-        set { if (editable) Box.Text = value; else { pickValue = value; Invalidate(); } }
+        set
+        {
+            if (editable) Box.Text = value;
+            else { pickValue = value; Invalidate(); ValueChanged?.Invoke(this, EventArgs.Empty); }
+        }
     }
 
     public DarkField Option(string value, string text)

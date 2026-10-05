@@ -28,6 +28,16 @@ static class Wallpaper
 
     public static int Count() => Monitors().Count;
 
+    /// Формы подключённых экранов для режима «как на экране».
+    public static string ScreenRatios()
+    {
+        var sizes = Monitors().Select(m => (m.Width, m.Height)).ToList();
+        if (sizes.Count == 0)
+            sizes = Screen.AllScreens.Select(s => (s.Bounds.Width, s.Bounds.Height)).ToList();
+
+        return RatioSelection.FromMonitors(sizes);
+    }
+
     public static bool Set(IReadOnlyList<string> files)
     {
         if (files.Count == 0) return false;

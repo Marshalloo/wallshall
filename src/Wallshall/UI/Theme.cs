@@ -22,6 +22,7 @@ static class Theme
     public static readonly Color Text = Color.White;
     public static readonly Color TextSecondary = Color.FromArgb(200, 200, 200);
     public static readonly Color TextDisabled = Color.FromArgb(120, 120, 120);
+    public static readonly Color ShapeIdle = Color.FromArgb(154, 154, 154);
     public static readonly Color Success = Color.FromArgb(108, 203, 95);
     public static readonly Color Error = Color.FromArgb(255, 153, 164);
     public static readonly Color Warning = Color.FromArgb(252, 225, 0);
@@ -115,6 +116,9 @@ static class Theme
         p.CloseFigure();
         return p;
     }
+
+    /// Цвет поверх фона карточки — для мягкой подсветки выбранного.
+    public static Color Tint(Color color, float alpha) => Blend(Card, color, alpha);
 
     public static Color Blend(Color a, Color b, float t) => Color.FromArgb(
         (int)(a.R + (b.R - a.R) * t), (int)(a.G + (b.G - a.G) * t), (int)(a.B + (b.B - a.B) * t));

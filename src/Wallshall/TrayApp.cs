@@ -37,6 +37,7 @@ class TrayApp : ApplicationContext
 
     public TrayApp()
     {
+        AppSettings.ScreenRatios = Wallpaper.ScreenRatios;
         settings = AppSettings.Load();
         state = State.Load();
         EnsureDirs();

@@ -1,121 +1,192 @@
-/// Выбор пропорций: несколько сразу, плюс «Все широкие» и «Все вертикальные».
-/// Правила выбора живут в RatioSelection, здесь только отрисовка.
+using System.Drawing.Drawing2D;
+
+/// Плитка с нарисованной пропорцией: форму видно, не вчитываясь в числа.
+class RatioTile : Control
+{
+    bool hover, chosen;
+
+    public string Ratio { get; }
+
+    public RatioTile(string ratio)
+    {
+        Ratio = ratio;
+        Text = ratio.Replace("x", "×");
+
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw |
+                 ControlStyles.Selectable, true);
+        Size = new Size(64, 68);
+        Margin = new Padding(0, 0, 8, 8);
+        TabStop = true;
+        Cursor = Cursors.Hand;
+    }
+
+    public bool Chosen
+    {
+        get => chosen;
+        set { if (chosen == value) return; chosen = value; Invalidate(); }
+    }
+
+    protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
+    protected override void OnMouseDown(MouseEventArgs e) { Focus(); base.OnMouseDown(e); }
+    protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
+    protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
+
+    protected override bool IsInputKey(Keys keyData) =>
+        keyData is Keys.Space or Keys.Enter || base.IsInputKey(keyData);
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.KeyCode is not (Keys.Space or Keys.Enter)) return;
+
+        OnClick(EventArgs.Empty);
+        e.Handled = true;
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        g.Clear(Parent?.BackColor ?? Theme.Card);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+
+        var box = new RectangleF(0.5f, 0.5f, Width - 1f, Height - 1f);
+        using (var path = Theme.RoundRect(box, LogicalToDeviceUnits(4)))
+        {
+            var back = chosen ? Theme.Tint(Theme.Accent, 0.18f) : hover ? Theme.ControlHover : Theme.Field;
+            using var fill = new SolidBrush(back);
+            using var pen = new Pen(chosen ? Theme.Accent : Theme.Border);
+            g.FillPath(fill, path);
+            g.DrawPath(pen, path);
+        }
+
+        PaintShape(g);
+
+        var label = new Rectangle(0, Height - LogicalToDeviceUnits(20), Width, LogicalToDeviceUnits(18));
+        TextRenderer.DrawText(g, Text, Font, label, chosen ? Theme.Text : Theme.TextSecondary,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
+            TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
+
+        if (!Focused || !ShowFocusCues) return;
+
+        using var ring = Theme.RoundRect(new RectangleF(1.5f, 1.5f, Width - 3f, Height - 3f), LogicalToDeviceUnits(3));
+        using var ringPen = new Pen(Theme.Text, 1.5f);
+        g.DrawPath(ringPen, ring);
+    }
+
+    void PaintShape(Graphics g)
+    {
+        float span = LogicalToDeviceUnits(38);
+        double ratio = RatioSelection.Ratio(Ratio);
+
+        float w = ratio >= 1 ? span : (float)(span * ratio);
+        float h = ratio >= 1 ? (float)(span / ratio) : span;
+        h = Math.Max(h, LogicalToDeviceUnits(4));
+
+        float cy = (Height - LogicalToDeviceUnits(18)) / 2f;
+        var shape = new RectangleF((Width - w) / 2f, cy - h / 2f, w, h);
+
+        using var path = Theme.RoundRect(shape, LogicalToDeviceUnits(2));
+        using var brush = new SolidBrush(chosen ? Theme.Accent : Theme.ShapeIdle);
+        g.FillPath(brush, path);
+    }
+}
+
+/// Пропорции: режим сверху, ручной выбор — плитками под ним.
 class RatioPicker : TableLayoutPanel
 {
-    static readonly (string Caption, string[] Values)[] Groups =
-    {
-        ("Широкие", new[] { "16x9", "16x10" }),
-        ("Сверхширокие", new[] { "21x9", "32x9", "48x9" }),
-        ("Вертикальные", new[] { "9x16", "10x16", "9x18" }),
-        ("Квадратные", new[] { "1x1", "3x2", "4x3", "5x4" }),
-    };
-
     readonly RatioSelection selection = new();
-    readonly ToolTip tips = new();
-    readonly DarkButton any;
-    readonly List<DarkButton> chips = new();
-    readonly FlowLayoutPanel extraRow;
+    readonly DarkSegments modes = new();
+    readonly FlowLayoutPanel tiles = new();
+    readonly Label hint = new();
+    readonly List<RatioTile> all = new();
+
+    public event EventHandler? ValueChanged;
 
     public RatioPicker()
     {
-        ColumnCount = 2;
+        ColumnCount = 1;
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
         Margin = Padding.Empty;
-        ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        var modes = Row("");
-        any = Chip("Любые", 70);
-        any.Click += (_, _) => { selection.Clear(); Sync(); };
-        modes.Controls.Add(any);
-        modes.Controls.Add(Mode("Все широкие", RatioSelection.AllWide, "Любые горизонтальные пропорции"));
-        modes.Controls.Add(Mode("Все вертикальные", RatioSelection.AllPortrait, "Любые вертикальные пропорции"));
+        modes.Add(RatioSelection.ModeScreen, "Как на экране")
+             .Add(RatioSelection.ModeAny, "Любые")
+             .Add(RatioSelection.ModeLandscape, "Горизонтальные")
+             .Add(RatioSelection.ModePortrait, "Вертикальные")
+             .Add(RatioSelection.ModeCustom, "Свои");
+        modes.ValueChanged += (_, _) => { Sync(); Changed(); };
+        Controls.Add(modes);
 
-        foreach (var (caption, values) in Groups)
+        tiles.AutoSize = true;
+        tiles.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        tiles.MaximumSize = new Size(440, 0);
+        tiles.Margin = new Padding(0, 10, 0, 0);
+        foreach (var ratio in RatioSelection.Known)
         {
-            var row = Row(caption);
-            foreach (var value in values) row.Controls.Add(Exact(value, value.Replace("x", "×")));
+            var tile = new RatioTile(ratio);
+            tile.Click += (_, _) => { selection.Toggle(ratio); Sync(); Changed(); };
+            all.Add(tile);
+            tiles.Controls.Add(tile);
         }
+        Controls.Add(tiles);
 
-        extraRow = Row("Другие");
-        ShowRow(extraRow, false);
+        hint.AutoSize = true;
+        hint.MaximumSize = new Size(440, 0);
+        hint.ForeColor = Theme.TextSecondary;
+        hint.Margin = new Padding(0, 8, 0, 2);
+        Controls.Add(hint);
 
         Sync();
+    }
+
+    public string Mode
+    {
+        get => modes.Value;
+        set { modes.Value = value; Sync(); }
     }
 
     public string Value
     {
         get => selection.Value;
-        set
-        {
-            selection.Value = value;
-
-            foreach (var token in RatioSelection.Parse(selection.Value))
-                if (!chips.Any(chip => ValueOf(chip) == token))
-                {
-                    extraRow.Controls.Add(Exact(token, token));
-                    ShowRow(extraRow, true);
-                }
-
-            Sync();
-        }
+        set { selection.Value = value; Sync(); }
     }
+
+    void Changed() => ValueChanged?.Invoke(this, EventArgs.Empty);
 
     void Sync()
     {
-        foreach (var chip in chips) chip.Chosen = selection.Has(ValueOf(chip));
-        any.Chosen = selection.Empty;
+        bool custom = modes.Value == RatioSelection.ModeCustom;
+        tiles.Visible = custom;
+
+        foreach (var tile in all) tile.Chosen = selection.Has(tile.Ratio);
+
+        hint.Text = custom
+            ? selection.Empty ? "Ничего не выбрано — подойдут обои любой формы." : ""
+            : Hint(modes.Value);
+        hint.Visible = hint.Text != "";
     }
 
-    static string ValueOf(DarkButton chip) => (string)chip.Tag!;
-
-    FlowLayoutPanel Row(string caption)
+    static string Hint(string mode) => mode switch
     {
-        var label = new Label
-        {
-            Text = caption,
-            AutoSize = true,
-            ForeColor = Theme.TextSecondary,
-            Anchor = AnchorStyles.Left,
-            Margin = new Padding(0, 4, 12, 6),
-        };
-        Controls.Add(label);
+        RatioSelection.ModeScreen => ScreenHint(),
+        RatioSelection.ModeLandscape => "Любые горизонтальные, включая сверхширокие и близкие к квадрату.",
+        RatioSelection.ModePortrait => "Любые вертикальные — для монитора, повёрнутого на бок.",
+        _ => "Подойдут обои любой формы.",
+    };
 
-        var row = new FlowLayoutPanel
-        {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            WrapContents = false,
-            Margin = Padding.Empty,
-            Tag = label,
-        };
-        Controls.Add(row);
-        return row;
-    }
-
-    static void ShowRow(FlowLayoutPanel row, bool visible)
+    static string ScreenHint()
     {
-        row.Visible = visible;
-        ((Control)row.Tag!).Visible = visible;
-    }
+        var screen = AppSettings.ScreenRatios();
+        if (screen == "") return "Форму экрана определить не удалось — фильтр по пропорциям не ставится.";
 
-    static DarkButton Chip(string text, int minWidth) => new DarkButton { Text = text }.AsChip(minWidth);
+        if (RatioSelection.IsKeyword(screen))
+            return screen == RatioSelection.ModeLandscape
+                ? "У экрана необычная форма — берём любые горизонтальные."
+                : "У экрана необычная форма — берём любые вертикальные.";
 
-    DarkButton Mode(string text, string value, string hint)
-    {
-        var chip = Track(Chip(text, 110), value);
-        tips.SetToolTip(chip, hint);
-        return chip;
-    }
-
-    DarkButton Exact(string value, string text) => Track(Chip(text, 56), value);
-
-    DarkButton Track(DarkButton chip, string value)
-    {
-        chip.Tag = value;
-        chip.Click += (_, _) => { selection.Toggle(value); Sync(); };
-        chips.Add(chip);
-        return chip;
+        var names = string.Join(" и ", RatioSelection.Parse(screen).Select(r => r.Replace("x", "×")));
+        return $"Определено по экрану: {names}.";
     }
 }
