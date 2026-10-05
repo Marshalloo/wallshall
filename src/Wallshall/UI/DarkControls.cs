@@ -566,7 +566,6 @@ class DarkField : Control
 
         Box.Enter += (_, _) => Invalidate();
         Box.Leave += (_, _) => Invalidate();
-        Box.TextChanged += (_, _) => ValueChanged?.Invoke(this, EventArgs.Empty);
         Box.MouseEnter += (_, _) => UpdateHover();
         Box.MouseLeave += (_, _) => UpdateHover();
         Box.KeyDown += (_, e) =>
@@ -597,16 +596,10 @@ class DarkField : Control
         set => Box.PlaceholderText = value;
     }
 
-    public event EventHandler? ValueChanged;
-
     public string Value
     {
         get => editable ? Box.Text.Trim() : pickValue;
-        set
-        {
-            if (editable) Box.Text = value;
-            else { pickValue = value; Invalidate(); ValueChanged?.Invoke(this, EventArgs.Empty); }
-        }
+        set { if (editable) Box.Text = value; else { pickValue = value; Invalidate(); } }
     }
 
     public DarkField Option(string value, string text)

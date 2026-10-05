@@ -24,9 +24,6 @@ class SettingsForm : DarkForm
     readonly DarkField topRange = new(200) { Editable = false };
     readonly DarkField atLeast = new(200) { Placeholder = "Любое" };
     readonly RatioPicker ratios = new();
-    readonly Label count = new() { AutoSize = true, ForeColor = Theme.TextSecondary };
-    readonly System.Windows.Forms.Timer countDelay = new() { Interval = 500 };
-    CancellationTokenSource? counting;
     readonly DarkField interval = new(200);
 
     readonly DarkField cacheDir = new(300);
@@ -83,7 +80,6 @@ class SettingsForm : DarkForm
         filters.AddRow("Топ за", topRange);
         filters.AddRow("Мин. разрешение", atLeast);
         filters.AddTallRow("Пропорции", ratios);
-        filters.AddRow("", count);
         Section("Фильтры", filters);
 
         var favorites = new Card();
@@ -152,45 +148,7 @@ class SettingsForm : DarkForm
         browseFavorites.Click += (_, _) => Browse(favoritesDir, "Папка для избранных обоев");
         save.Click += (_, _) => Save();
 
-        foreach (var box in new[] { general, anime, people, sfw, sketchy, nsfw })
-            box.CheckedChanged += (_, _) => ScheduleCount();
-        topRange.ValueChanged += (_, _) => ScheduleCount();
-        atLeast.ValueChanged += (_, _) => ScheduleCount();
-        ratios.ValueChanged += (_, _) => ScheduleCount();
-        countDelay.Tick += async (_, _) => await CountAsync();
-
         FinishLayout();
-        ScheduleCount();
-    }
-
-    /// Счётчик обновляется с задержкой: пока человек щёлкает фильтры, запрос не уходит.
-    void ScheduleCount()
-    {
-        count.Text = "Считаю…";
-        countDelay.Stop();
-        countDelay.Start();
-    }
-
-    async Task CountAsync()
-    {
-        countDelay.Stop();
-        counting?.Cancel();
-        counting?.Dispose();
-        counting = new CancellationTokenSource();
-
-        var token = counting.Token;
-        var probe = Collect(Result.Clone());
-
-        var total = await WallhavenApi.CountAsync(probe, token);
-        if (token.IsCancellationRequested) return;
-
-        count.Text = total switch
-        {
-            null => "Сайт недоступен — не получилось посчитать",
-            0 => "Под эти фильтры не подходит ни одной картинки",
-            _ => $"Подходит {Number(total.Value)} обоев",
-        };
-        count.ForeColor = total == 0 ? Theme.Warning : Theme.TextSecondary;
     }
 
     void SetKeyStatus(string text, Color color)
@@ -282,7 +240,6 @@ class SettingsForm : DarkForm
         DialogResult = DialogResult.OK;
     }
 
-    /// Поля, из которых складывается запрос к сайту: нужны и при сохранении, и для счётчика.
     AppSettings Collect(AppSettings into)
     {
         into.ApiKey = apiKey.Value;
@@ -297,28 +254,5 @@ class SettingsForm : DarkForm
         into.Ratios = ratios.Value;
         into.Mode = ratios.Mode;
         return into;
-    }
-
-    static string Number(int value)
-    {
-        var digits = value.ToString();
-        var text = "";
-        for (int i = 0; i < digits.Length; i++)
-        {
-            if (i > 0 && (digits.Length - i) % 3 == 0) text += " ";
-            text += digits[i];
-        }
-        return text;
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            countDelay.Dispose();
-            counting?.Cancel();
-            counting?.Dispose();
-        }
-        base.Dispose(disposing);
     }
 }

@@ -52,34 +52,6 @@ sealed class WallhavenApi : IDisposable
         });
     }
 
-    /// Сколько обоев подходит под фильтры. null — сайт не ответил.
-    public static async Task<int?> CountAsync(AppSettings settings, CancellationToken ct)
-    {
-        try
-        {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
-            using var req = new HttpRequestMessage(HttpMethod.Get, $"{SearchUrl}?{settings.BuildQuery()}&page=1");
-            var key = settings.ApiKey;
-            if (key != "") req.Headers.Add("X-API-Key", key);
-            req.Headers.UserAgent.ParseAdd(UserAgent);
-
-            using var resp = await http.SendAsync(req, ct);
-            if (!resp.IsSuccessStatusCode) return null;
-
-            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
-            return doc.RootElement.TryGetProperty("meta", out var meta) &&
-                   meta.TryGetProperty("total", out var total) &&
-                   total.TryGetInt32(out int value)
-                ? value
-                : null;
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine(ex);
-            return null;
-        }
-    }
-
     public static async Task<HttpStatusCode?> CheckKeyAsync(string key)
     {
         try
