@@ -45,7 +45,7 @@ class AppSettings
                 $"&categories={B(General)}{B(Anime)}{B(People)}" +
                 $"&purity={B(Sfw)}{B(Sketchy)}{B(nsfw)}";
         if (AtLeast != "") q += "&atleast=" + Uri.EscapeDataString(AtLeast);
-        if (Ratios != "") q += "&ratios=" + Uri.EscapeDataString(Ratios);
+        if (Ratios != "") q += "&ratios=" + string.Join(",", RatioSelection.Parse(Ratios).Select(Uri.EscapeDataString));
         return q;
     }
 
