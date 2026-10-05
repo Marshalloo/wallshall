@@ -123,6 +123,16 @@ class DarkForm : Form
         PerformLayout();
     }
 
+    /// На невысоких экранах окно упирается в рабочую область и получает прокрутку.
+    protected override void OnLoad(EventArgs e)
+    {
+        base.OnLoad(e);
+
+        var work = Screen.FromControl(this).WorkingArea.Size;
+        MaximumSize = new Size(work.Width, work.Height);
+        if (Height >= work.Height || Width >= work.Width) AutoScroll = true;
+    }
+
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
@@ -230,15 +240,27 @@ class Card : Panel
 
     public void AddRow(string label, params Control[] controls)
     {
-        grid.Controls.Add(new Label
-        {
-            Text = label, AutoSize = true, Anchor = AnchorStyles.Left,
-            Margin = new Padding(0, 8, 12, 8),
-        });
+        AddLabel(label, AnchorStyles.Left);
         var row = UI.Row(controls);
         row.Margin = new Padding(0, 6, 0, 6);
         grid.Controls.Add(row);
     }
+
+    /// Строка с высоким контролом: подпись прижата к верху, а не к центру.
+    public void AddTallRow(string label, Control control)
+    {
+        AddLabel(label, AnchorStyles.Left | AnchorStyles.Top);
+        control.Anchor = AnchorStyles.Left | AnchorStyles.Top;
+        control.Margin = new Padding(0, 8, 0, 2);
+        grid.Controls.Add(control);
+    }
+
+    void AddLabel(string text, AnchorStyles anchor) =>
+        grid.Controls.Add(new Label
+        {
+            Text = text, AutoSize = true, Anchor = anchor,
+            Margin = new Padding(0, 8, 12, 8),
+        });
 
     protected override void OnPaint(PaintEventArgs e)
     {
@@ -255,9 +277,16 @@ class Card : Panel
 
 class DarkButton : Button
 {
-    bool hover, pressed;
+    bool hover, pressed, chosen;
 
     public bool Primary { get; set; }
+
+    /// Кнопка-переключатель: во включённом состоянии красится акцентом, как Primary.
+    public bool Chosen
+    {
+        get => chosen;
+        set { if (chosen == value) return; chosen = value; Invalidate(); }
+    }
 
     public DarkButton()
     {
@@ -268,6 +297,15 @@ class DarkButton : Button
         AutoSize = true;
         Padding = new Padding(12, 4, 12, 4);
         MinimumSize = new Size(96, 32);
+    }
+
+    /// Компактный вид для набора переключателей.
+    public DarkButton AsChip(int minWidth)
+    {
+        Padding = new Padding(8, 2, 8, 2);
+        MinimumSize = new Size(minWidth, 28);
+        Margin = new Padding(0, 0, 6, 6);
+        return this;
     }
 
     protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
@@ -281,9 +319,10 @@ class DarkButton : Button
         g.Clear(Parent?.BackColor ?? Theme.Bg);
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
+        bool accent = Primary || Chosen;
         Color fill, text;
         if (!Enabled) { fill = Theme.Control; text = Theme.TextDisabled; }
-        else if (Primary)
+        else if (accent)
         {
             fill = pressed ? Theme.AccentPressed : hover ? Theme.AccentHover : Theme.Accent;
             text = Theme.OnAccent;
@@ -298,7 +337,7 @@ class DarkButton : Button
         using (var path = Theme.RoundRect(r, LogicalToDeviceUnits(4)))
         {
             using (var b = new SolidBrush(fill)) g.FillPath(b, path);
-            if (!Primary)
+            if (!accent)
                 using (var p = new Pen(Theme.Border)) g.DrawPath(p, path);
         }
 

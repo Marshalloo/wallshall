@@ -23,7 +23,7 @@ class SettingsForm : DarkForm
 
     readonly DarkField topRange = new(200) { Editable = false };
     readonly DarkField atLeast = new(200) { Placeholder = "Любое" };
-    readonly DarkField ratios = new(200) { Placeholder = "Любые" };
+    readonly RatioPicker ratios = new();
     readonly DarkField interval = new(200);
 
     readonly DarkField cacheDir = new(300);
@@ -47,9 +47,6 @@ class SettingsForm : DarkForm
                 .Option("1y", "1 год");
         atLeast.Option("", "Любое").Option("1920x1080", "1920x1080").Option("2560x1440", "2560x1440")
                .Option("3440x1440", "3440x1440").Option("3840x2160", "3840x2160");
-        ratios.Option("", "Любые").Option("16x9", "16x9").Option("16x10", "16x10")
-              .Option("21x9", "21x9").Option("32x9", "32x9").Option("9x16", "9x16")
-              .Option("16x9,16x10", "16x9 и 16x10");
         interval.Option("5", "5").Option("10", "10").Option("15", "15").Option("30", "30")
                 .Option("60", "60").Option("180", "180");
 
@@ -82,7 +79,7 @@ class SettingsForm : DarkForm
         filters.AddRow("Контент", sfw, sketchy, nsfw);
         filters.AddRow("Топ за", topRange);
         filters.AddRow("Мин. разрешение", atLeast);
-        filters.AddRow("Пропорции", ratios);
+        filters.AddTallRow("Пропорции", ratios);
         Section("Фильтры", filters);
 
         var favorites = new Card();
@@ -239,7 +236,7 @@ class SettingsForm : DarkForm
         Result.Nsfw = nsfw.Checked;
         Result.TopRange = topRange.Value;
         Result.AtLeast = atLeast.Value;
-        Result.Ratios = ratios.Value.Replace(" ", "");
+        Result.Ratios = ratios.Value;
         Result.IntervalMinutes = minutes;
         Result.PerMonitor = perMonitor.Checked;
         Result.FavoritesOnly = favoritesOnly.Checked;
