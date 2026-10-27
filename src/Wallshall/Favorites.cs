@@ -43,9 +43,15 @@ static class Favorites
 
         if (picked.Count < count)
         {
+            // Круг пройден. Показанную последней отодвигаем в конец очереди,
+            // иначе новый круг может начаться с той же картинки, что висит сейчас.
+            var last = shown.Count > 0 ? shown[^1] : "";
             shown.Clear();
+
             var rest = all.Where(f => !picked.Contains(f, StringComparer.OrdinalIgnoreCase))
-                .OrderBy(_ => Random.Shared.Next());
+                .OrderBy(f => string.Equals(Path.GetFileName(f), last, StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+                .ThenBy(_ => Random.Shared.Next());
+
             foreach (var file in rest)
             {
                 if (picked.Count >= count) break;

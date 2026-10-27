@@ -49,35 +49,11 @@ static class Wallpaper
 
     static List<MonitorInfo> Describe(List<(string Id, Rect Rect)> found)
     {
-        var result = new List<MonitorInfo>();
-        if (found.Count == 0) return result;
+        var names = MonitorLayout.Name(found.Select(m => (m.Rect.Left, m.Rect.Top)).ToList());
 
-        bool horizontal = found.Select(m => m.Rect.Left).Distinct().Count() == found.Count;
-        bool vertical = !horizontal && found.Select(m => m.Rect.Top).Distinct().Count() == found.Count;
-
-        var order = Enumerable.Range(0, found.Count).ToList();
-        if (horizontal) order.Sort((a, b) => found[a].Rect.Left.CompareTo(found[b].Rect.Left));
-        else if (vertical) order.Sort((a, b) => found[a].Rect.Top.CompareTo(found[b].Rect.Top));
-
-        var labels = Labels(found.Count, horizontal, vertical);
-        var names = new string[found.Count];
-        for (int i = 0; i < order.Count; i++) names[order[i]] = labels[i];
-
-        for (int i = 0; i < found.Count; i++)
-        {
-            var rect = found[i].Rect;
-            result.Add(new MonitorInfo(found[i].Id, names[i], rect.Right - rect.Left, rect.Bottom - rect.Top));
-        }
-        return result;
+        return found.Select((m, i) => new MonitorInfo(
+            m.Id, names[i], m.Rect.Right - m.Rect.Left, m.Rect.Bottom - m.Rect.Top)).ToList();
     }
-
-    static string[] Labels(int count, bool horizontal, bool vertical) =>
-        count == 1 ? new[] { "Экран" } :
-        horizontal && count == 2 ? new[] { "Левый", "Правый" } :
-        horizontal && count == 3 ? new[] { "Левый", "Центральный", "Правый" } :
-        vertical && count == 2 ? new[] { "Верхний", "Нижний" } :
-        vertical && count == 3 ? new[] { "Верхний", "Средний", "Нижний" } :
-        Enumerable.Range(1, count).Select(i => "Монитор " + i).ToArray();
 
     static bool SetPerMonitor(IReadOnlyList<string> files)
     {

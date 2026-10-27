@@ -28,26 +28,34 @@ sealed class WallhavenApi : IDisposable
             .ToList();
     }
 
-    public async Task DownloadAsync(IReadOnlyList<string> urls, string dir)
+    public async Task DownloadAsync(IReadOnlyList<string> urls, string dir, IProgress<double>? progress = null)
     {
+        int done = 0;
+        progress?.Report(0);
+
         var options = new ParallelOptions { MaxDegreeOfParallelism = ParallelDownloads };
         await Parallel.ForEachAsync(urls, options, async (url, ct) =>
         {
             var target = Path.Combine(dir, FileNameOf(url));
-            if (File.Exists(target)) return;
-
             var tmp = target + ".part";
             try
             {
-                await using (var src = await http.GetStreamAsync(url, ct))
-                await using (var dst = File.Create(tmp))
-                    await src.CopyToAsync(dst, ct);
-                File.Move(tmp, target, overwrite: true);
+                if (!File.Exists(target))
+                {
+                    await using (var src = await http.GetStreamAsync(url, ct))
+                    await using (var dst = File.Create(tmp))
+                        await src.CopyToAsync(dst, ct);
+                    File.Move(tmp, target, overwrite: true);
+                }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine(ex);
                 Cache.Delete(tmp);
+            }
+            finally
+            {
+                progress?.Report((double)Interlocked.Increment(ref done) / urls.Count);
             }
         });
     }

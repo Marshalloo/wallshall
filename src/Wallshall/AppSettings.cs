@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -45,6 +46,19 @@ class AppSettings
 
     /// Формы экранов подставляет приложение: сюда не тянем ни COM, ни WinForms.
     public static Func<string> ScreenRatios { get; set; } = () => "";
+    [JsonIgnore] public bool AnyCategory => General || Anime || People;
+    [JsonIgnore] public bool AnyPurity => Sfw || Sketchy || Nsfw;
+    [JsonIgnore] public bool IntervalValid => IntervalMinutes >= MinInterval && IntervalMinutes <= MaxInterval;
+
+    public const int MinInterval = 1;
+    public const int MaxInterval = 1440;
+
+    static readonly string[] Modes =
+    {
+        RatioSelection.ModeScreen, RatioSelection.ModeAny, RatioSelection.ModeLandscape,
+        RatioSelection.ModePortrait, RatioSelection.ModeCustom,
+    };
+
     public int IntervalMinutes { get; set; } = 15;
     public bool PerMonitor { get; set; } = false;
     public bool FavoritesOnly { get; set; } = false;
@@ -80,10 +94,38 @@ class AppSettings
         try
         {
             if (File.Exists(FilePath))
-                return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath)) ?? Fresh();
+                return (JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath)) ?? Fresh()).Normalized();
         }
-        catch { }
+        catch (Exception ex) { Debug.WriteLine(ex); }
         return Fresh();
+    }
+
+    /// Файл настроек правят руками и он может быть повреждён, поэтому значения
+    /// приводятся к допустимым здесь, на входе. Дальше коду можно им доверять.
+    public AppSettings Normalized()
+    {
+        IntervalMinutes = Math.Clamp(IntervalMinutes, MinInterval, MaxInterval);
+
+        if (!AnyCategory) General = true;
+        if (!AnyPurity) Sfw = true;
+
+        if (RatioMode != null && !Modes.Contains(RatioMode)) RatioMode = null;
+        Ratios = string.Join(",", RatioSelection.Parse(Ratios).Where(r => !RatioSelection.IsKeyword(r)));
+
+        CacheDir = Folder(CacheDir, DefaultCacheDir);
+        FavoritesDir = Folder(FavoritesDir, DefaultFavoritesDir);
+
+        // Общая папка означала бы, что очистка кэша стирает избранное
+        if (Cache.SamePath(CacheDir, FavoritesDir)) FavoritesDir = DefaultFavoritesDir;
+        if (Cache.SamePath(CacheDir, FavoritesDir)) CacheDir = DefaultCacheDir;
+
+        return this;
+    }
+
+    static string Folder(string path, string fallback)
+    {
+        try { return path.Trim() == "" ? fallback : Path.GetFullPath(path); }
+        catch (Exception ex) { Debug.WriteLine(ex); return fallback; }
     }
 
     public void Save()

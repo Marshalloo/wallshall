@@ -117,6 +117,14 @@ static class Theme
         return p;
     }
 
+    /// Рамка фокуса внутри контрола размером width×height.
+    public static void FocusRing(Graphics g, int width, int height, int radius)
+    {
+        using var path = RoundRect(new RectangleF(1.5f, 1.5f, width - 3f, height - 3f), radius);
+        using var pen = new Pen(Text, 1.5f);
+        g.DrawPath(pen, path);
+    }
+
     /// Цвет поверх фона карточки — для мягкой подсветки выбранного.
     public static Color Tint(Color color, float alpha) => Blend(Card, color, alpha);
 

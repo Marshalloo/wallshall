@@ -68,11 +68,7 @@ class RatioTile : Control
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
             TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
 
-        if (!Focused || !ShowFocusCues) return;
-
-        using var ring = Theme.RoundRect(new RectangleF(1.5f, 1.5f, Width - 3f, Height - 3f), LogicalToDeviceUnits(3));
-        using var ringPen = new Pen(Theme.Text, 1.5f);
-        g.DrawPath(ringPen, ring);
+        if (Focused && ShowFocusCues) Theme.FocusRing(g, Width, Height, LogicalToDeviceUnits(3));
     }
 
     void PaintShape(Graphics g)
@@ -102,8 +98,6 @@ class RatioPicker : TableLayoutPanel
     readonly Label hint = new();
     readonly List<RatioTile> all = new();
 
-    public event EventHandler? ValueChanged;
-
     public RatioPicker()
     {
         ColumnCount = 1;
@@ -116,7 +110,7 @@ class RatioPicker : TableLayoutPanel
              .Add(RatioSelection.ModeLandscape, "Горизонтальные")
              .Add(RatioSelection.ModePortrait, "Вертикальные")
              .Add(RatioSelection.ModeCustom, "Свои");
-        modes.ValueChanged += (_, _) => { Sync(); Changed(); };
+        modes.ValueChanged += (_, _) => Sync();
         Controls.Add(modes);
 
         tiles.AutoSize = true;
@@ -126,7 +120,7 @@ class RatioPicker : TableLayoutPanel
         foreach (var ratio in RatioSelection.Known)
         {
             var tile = new RatioTile(ratio);
-            tile.Click += (_, _) => { selection.Toggle(ratio); Sync(); Changed(); };
+            tile.Click += (_, _) => { selection.Toggle(ratio); Sync(); };
             all.Add(tile);
             tiles.Controls.Add(tile);
         }
@@ -152,8 +146,6 @@ class RatioPicker : TableLayoutPanel
         get => selection.Value;
         set { selection.Value = value; Sync(); }
     }
-
-    void Changed() => ValueChanged?.Invoke(this, EventArgs.Empty);
 
     void Sync()
     {

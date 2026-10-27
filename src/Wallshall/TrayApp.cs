@@ -19,6 +19,7 @@ class TrayApp : ApplicationContext
     readonly DarkMenu menu;
     readonly System.Windows.Forms.Timer timer;
     readonly SemaphoreSlim gate = new(1, 1);
+    readonly TrayBusy busy;
 
     readonly ToolStripMenuItem favoriteItem;
     readonly ToolStripMenuItem siteItem;
@@ -68,6 +69,7 @@ class TrayApp : ApplicationContext
             Visible = true,
         };
         tray.DoubleClick += async (_, _) => await ChangeAsync();
+        busy = new TrayBusy(tray, tray.Icon!);
 
         timer = new System.Windows.Forms.Timer { Interval = settings.IntervalMinutes * 60_000 };
         timer.Tick += async (_, _) => await ChangeAsync();
@@ -79,6 +81,7 @@ class TrayApp : ApplicationContext
     async Task ChangeAsync()
     {
         if (!await gate.WaitAsync(0)) return;
+        using var working = busy.Work();
         try
         {
             int need = settings.PerMonitor ? Math.Max(1, Wallpaper.Count()) : 1;
@@ -94,22 +97,25 @@ class TrayApp : ApplicationContext
 
             bool perMonitor = Wallpaper.Set(files);
             state.Current = perMonitor ? files : new List<string> { files[0] };
-
-            if (settings.FavoritesOnly)
-            {
-                foreach (var file in files) state.MarkFavShown(Path.GetFileName(file));
-            }
-            else
-            {
-                foreach (var file in files) state.MarkUsed(Path.GetFileName(file));
-                Cache.Cleanup(CacheDir, state.Used, KeepUsedFiles);
-            }
-
-            state.Save();
+            Remember(files);
             SetStatus(Status(files, error));
             await WarmThumbsAsync();
         }
         finally { gate.Release(); }
+    }
+
+    /// История показов у избранного и у кэша своя: кэш ещё и чистится по ней.
+    void Remember(List<string> files)
+    {
+        foreach (var file in files)
+        {
+            var name = Path.GetFileName(file);
+            if (settings.FavoritesOnly) state.MarkFavShown(name);
+            else state.MarkUsed(name);
+        }
+
+        if (!settings.FavoritesOnly) Cache.Cleanup(CacheDir, state.Used, KeepUsedFiles);
+        state.Save();
     }
 
     (List<string> files, string? error) PickFavorites(int need)
@@ -159,7 +165,7 @@ class TrayApp : ApplicationContext
                 var fresh = urls.Where(u => !used.Contains(WallhavenApi.FileNameOf(u))).ToList();
                 if (fresh.Count > 0)
                 {
-                    await api.DownloadAsync(fresh, CacheDir);
+                    await api.DownloadAsync(fresh, CacheDir, busy);
                     return null;
                 }
                 state.Page++;
@@ -242,21 +248,21 @@ class TrayApp : ApplicationContext
         bool named = monitors.Count == blockFor;
 
         for (int i = 0; i < blockFor; i++)
-        {
-            var item = monitorItems[i];
-            var file = FileAt(i);
-            var name = named ? monitors[i].Name : $"Обои {i + 1}";
-            bool saved = file != null && Favorites.Contains(FavoritesDir, file);
+            UpdateMonitor(monitorItems[i], FileAt(i), named ? monitors[i].Name : $"Обои {i + 1}");
+    }
 
-            item.Text = file == null ? name : $"{name} · {Label(file)}" + (saved ? "  ★" : "");
-            item.Image = (file == null ? null : Thumb(file)) ?? Theme.MenuGlyph(GlyphPicture);
-            item.Enabled = file != null;
+    void UpdateMonitor(ToolStripMenuItem item, string? file, string name)
+    {
+        bool saved = file != null && Favorites.Contains(FavoritesDir, file);
 
-            var favorite = (ToolStripMenuItem)item.DropDownItems[0];
-            favorite.Text = saved ? "Убрать из избранного" : "В избранное";
-            favorite.Image = Theme.MenuGlyph(saved ? GlyphFavoriteOn : GlyphFavorite);
-            item.DropDownItems[1].Enabled = file != null && Cache.WallhavenId(file) != null;
-        }
+        item.Text = file == null ? name : $"{name} · {Label(file)}" + (saved ? "  ★" : "");
+        item.Image = (file == null ? null : Thumb(file)) ?? Theme.MenuGlyph(GlyphPicture);
+        item.Enabled = file != null;
+
+        var favorite = (ToolStripMenuItem)item.DropDownItems[0];
+        favorite.Text = saved ? "Убрать из избранного" : "В избранное";
+        favorite.Image = Theme.MenuGlyph(saved ? GlyphFavoriteOn : GlyphFavorite);
+        item.DropDownItems[1].Enabled = file != null && Cache.WallhavenId(file) != null;
     }
 
     static void Style(ToolStripItem item)
@@ -457,6 +463,7 @@ class TrayApp : ApplicationContext
     {
         settingsForm?.Close();
         timer.Stop();
+        busy.Dispose();
         tray.Visible = false;
         tray.Dispose();
         api.Dispose();

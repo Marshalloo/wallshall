@@ -397,42 +397,34 @@ class DarkButton : Button
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
         bool accent = Primary || Chosen;
-        Color fill, text;
-        if (!Enabled) { fill = Theme.Control; text = Theme.TextDisabled; }
-        else if (accent)
-        {
-            fill = pressed ? Theme.AccentPressed : hover ? Theme.AccentHover : Theme.Accent;
-            text = Theme.OnAccent;
-        }
-        else if (Segment)
-        {
-            fill = pressed ? Theme.ControlPressed : hover ? Theme.ControlHover : Theme.Field;
-            text = Theme.Text;
-        }
-        else
-        {
-            fill = pressed ? Theme.ControlPressed : hover ? Theme.ControlHover : Theme.Control;
-            text = pressed ? Theme.TextSecondary : Theme.Text;
-        }
+        var (fill, text) = Colors(accent);
 
-        var r = new RectangleF(0.5f, 0.5f, Width - 1f, Height - 1f);
-        using (var path = Theme.RoundRect(r, LogicalToDeviceUnits(Segment ? 3 : 4)))
+        var box = new RectangleF(0.5f, 0.5f, Width - 1f, Height - 1f);
+        using (var path = Theme.RoundRect(box, LogicalToDeviceUnits(Segment ? 3 : 4)))
         {
-            using (var b = new SolidBrush(fill)) g.FillPath(b, path);
+            using (var brush = new SolidBrush(fill)) g.FillPath(brush, path);
             if (!accent && !Segment)
-                using (var p = new Pen(Theme.Border)) g.DrawPath(p, path);
+                using (var pen = new Pen(Theme.Border)) g.DrawPath(pen, path);
         }
 
-        if (Focused && ShowFocusCues)
-        {
-            using var fp = Theme.RoundRect(new RectangleF(1.5f, 1.5f, Width - 3f, Height - 3f), LogicalToDeviceUnits(3));
-            using var pen = new Pen(Theme.Text, 1.5f);
-            g.DrawPath(pen, fp);
-        }
+        if (Focused && ShowFocusCues) Theme.FocusRing(g, Width, Height, LogicalToDeviceUnits(3));
 
         TextRenderer.DrawText(g, Text, Font, ClientRectangle, text,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
             TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
+    }
+
+    (Color Fill, Color Text) Colors(bool accent)
+    {
+        if (!Enabled) return (Theme.Control, Theme.TextDisabled);
+
+        if (accent)
+            return (pressed ? Theme.AccentPressed : hover ? Theme.AccentHover : Theme.Accent, Theme.OnAccent);
+
+        var idle = Segment ? Theme.Field : Theme.Control;
+        var fill = pressed ? Theme.ControlPressed : hover ? Theme.ControlHover : idle;
+
+        return (fill, Segment || !pressed ? Theme.Text : Theme.TextSecondary);
     }
 }
 
