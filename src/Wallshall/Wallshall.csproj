@@ -28,6 +28,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Классы приложения internal: наружу эта сборка ничего не предоставляет,
+         кроме как тестам -->
+    <InternalsVisibleTo Include="Wallshall.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
 
