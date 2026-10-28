@@ -4,12 +4,13 @@ on:
   push:
     branches: [main]
     tags: ['v*']
-  pull_request:
+    paths-ignore:
+      - 'README.md'
   workflow_dispatch:
 
 jobs:
-  # Тесты трогают реестр и DPAPI, поэтому идут на Windows
   test:
+    if: github.ref == 'refs/heads/main'
     runs-on: windows-latest
 
     steps:
@@ -22,10 +23,7 @@ jobs:
       - name: Test
         run: dotnet run --project tests/Wallshall.Tests/Wallshall.Tests.csproj -c Release
 
-  # Собирается только по тегу vX.Y.Z и только после зелёных тестов.
-  # Версия берётся из тега, поэтому в .exe попадает ровно то, что указано в релизе.
   release:
-    needs: test
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -49,7 +47,6 @@ jobs:
 
       - run: ls -l dist
 
-      # Запасной выход: если выкладка релиза отвалится, .exe можно забрать отсюда
       - uses: actions/upload-artifact@v4
         with:
           name: Wallshall
